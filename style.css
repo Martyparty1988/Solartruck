@@ -49,6 +49,9 @@ body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;backgroun
 /* ---- HEADER ---- */
 .app-header{position:sticky;top:0;z-index:100;padding:10px 16px;padding-top:calc(6px + var(--sat))}
 .header-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.header-left{display:flex;align-items:center;gap:8px}
+.back-btn{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-2);cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent;flex-shrink:0}
+.back-btn:active{transform:scale(.85);background:var(--glass-hover)}
 .app-logo{display:flex;align-items:center;gap:10px}
 .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--amber),#f97316);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 16px rgba(251,191,36,0.25)}
 .app-title{font-size:17px;font-weight:700;letter-spacing:-0.3px}
@@ -193,7 +196,15 @@ label{display:block;font-size:11px;font-weight:600;color:var(--text-3);margin-bo
 .week-summary{padding:11px 14px;margin-bottom:12px}
 .ws-title{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
 .ws-stats{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.ws-compare{margin-top:6px;padding-top:6px;border-top:1px solid var(--glass-border);font-size:11px;color:var(--text-2);display:flex;gap:10px;flex-wrap:wrap}
+.ws-compare .delta{font-weight:700;font-family:'JetBrains Mono',monospace}
+.ws-compare .delta.up{color:var(--green)}
+.ws-compare .delta.down{color:var(--red)}
+.ws-compare .delta.same{color:var(--text-3)}
 .dot{color:var(--text-3);font-weight:400}
+
+/* ---- ENTRY NOTE ---- */
+.entry-note{margin-top:5px;font-size:11px;color:var(--amber);font-style:italic;display:flex;align-items:center;gap:4px}
 
 /* ---- FILTER BADGE ON DASH ---- */
 .dash-filter{margin-bottom:12px}
@@ -275,6 +286,21 @@ label{display:block;font-size:11px;font-weight:600;color:var(--text-3);margin-bo
 .mt-8{margin-top:8px}.mt-16{margin-top:16px}.mb-8{margin-bottom:8px}.mb-16{margin-bottom:16px}
 .text-center{text-align:center}.text-muted{color:var(--text-3)}.text-sm{font-size:13px}
 .flex{display:flex}.gap-8{gap:8px}
+
+/* ---- ATTENDANCE TABLE ---- */
+.attendance-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:16px;padding-bottom:4px}
+.attendance-table{border-collapse:collapse;font-size:10px;font-family:'JetBrains Mono',monospace;min-width:100%}
+.attendance-table th,.attendance-table td{padding:5px 4px;text-align:center;border:1px solid var(--glass-border);white-space:nowrap}
+.attendance-table thead th{position:sticky;top:0;background:rgba(5,10,24,0.95);color:var(--text-3);font-weight:600;font-size:9px;z-index:2}
+.attendance-table thead th.day-header-cell{min-width:28px}
+.attendance-table tbody th{position:sticky;left:0;background:rgba(5,10,24,0.95);text-align:left;font-weight:600;color:var(--text);padding-left:6px;padding-right:8px;z-index:1;font-size:10px;max-width:80px;overflow:hidden;text-overflow:ellipsis}
+.attendance-table td.att-val{font-size:10px;color:var(--text-2)}
+.attendance-table td.att-val.has-hours{color:var(--text);background:var(--blue-dim)}
+.attendance-table td.att-val.high-hours{background:rgba(96,165,250,0.2);color:var(--blue);font-weight:700}
+.attendance-table td.att-val.zero{color:var(--text-3);opacity:.3}
+.attendance-table td.att-weekend{background:rgba(255,255,255,0.015)}
+.attendance-table tfoot td{font-weight:700;color:var(--amber);background:rgba(251,191,36,0.06)}
+.attendance-table tfoot th{position:sticky;left:0;background:rgba(5,10,24,0.95);text-align:left;font-weight:700;color:var(--amber);padding-left:6px;font-size:10px}
 
 @media(min-width:500px){
   .page{max-width:500px;margin:0 auto}

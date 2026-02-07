@@ -157,6 +157,7 @@ function addEntry(entry) {
       strings: parseInt(entry.strings) || 0,
       tables: entry.tables || '',
       workType: entry.workType,
+      note: entry.note || '',
       created: new Date().toISOString()
     };
     const req = store.add(record);
@@ -235,7 +236,7 @@ async function exportToCSV(projectId, month, employeeId) {
     entries = entries.filter(e => e.employeeId === employeeId);
   }
 
-  let csv = 'Projekt;Datum;Jméno;Hodiny;Stringy;Typ práce;Stoly\n';
+  let csv = 'Projekt;Datum;Jméno;Hodiny;Stringy;Typ práce;Stoly;Poznámka\n';
 
   entries.forEach(e => {
     csv += [
@@ -245,7 +246,8 @@ async function exportToCSV(projectId, month, employeeId) {
       e.hours,
       e.strings,
       e.workType === 'hourly' ? 'Hodinovka' : 'Úkol/Stringy',
-      '"' + (e.tables || '').replace(/"/g, '""') + '"'
+      '"' + (e.tables || '').replace(/"/g, '""') + '"',
+      '"' + (e.note || '').replace(/"/g, '""') + '"'
     ].join(';') + '\n';
   });
 

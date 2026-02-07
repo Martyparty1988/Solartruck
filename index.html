@@ -30,9 +30,14 @@
 
   <header class="app-header glass-bar">
     <div class="header-top">
-      <div class="app-logo">
-        <div class="logo-icon">☀️</div>
-        <div><div class="app-title">SolarTrack</div><div class="app-subtitle">Evidence práce</div></div>
+      <div class="header-left">
+        <button class="btn-round glass-btn back-btn" id="backBtn" onclick="goBack()" style="display:none">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="app-logo">
+          <div class="logo-icon">☀️</div>
+          <div><div class="app-title">SolarTrack</div><div class="app-subtitle">Evidence práce</div></div>
+        </div>
       </div>
       <button class="btn-round glass-btn" onclick="openPage('pageSettings')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -48,6 +53,7 @@
     <div class="week-summary glass" id="weekSummary" style="display:none">
       <div class="ws-title">📅 Tento týden</div>
       <div class="ws-stats"><span id="weekDays">0 dnů</span><span class="dot">·</span><span id="weekHours">0h</span><span class="dot">·</span><span id="weekStrings">0s</span></div>
+      <div class="ws-compare" id="weekCompare" style="display:none"></div>
     </div>
     <div class="dash-filter" id="dashFilter" style="display:none">
       <select id="dashEmployeeFilter" onchange="loadDashboard()"><option value="">Všichni zaměstnanci</option></select>
@@ -107,6 +113,10 @@
     </div>
     <div class="section-header"><h3 class="section-title">👷 Po zaměstnancích</h3></div>
     <div id="employeeStatsContainer"></div>
+
+    <!-- Docházková tabulka -->
+    <div class="section-header mt-16"><h3 class="section-title">📋 Docházka</h3></div>
+    <div class="attendance-scroll" id="attendanceContainer"></div>
     <div class="section-header mt-16"><h3 class="section-title">📈 Grafy</h3></div>
     <div class="glass chart-container"><div class="chart-title">Hodiny / den</div><div class="chart-wrapper"><canvas id="chartHours"></canvas></div></div>
     <div class="glass chart-container"><div class="chart-title">Stringy / den</div><div class="chart-wrapper"><canvas id="chartStrings"></canvas></div></div>
@@ -166,6 +176,7 @@
       <div class="form-group"><label>Typ práce</label><div class="work-type-toggle"><button class="work-type-btn active-hourly" id="btnHourly" onclick="setWorkType('hourly')">⏱ Hodinovka</button><button class="work-type-btn" id="btnTask" onclick="setWorkType('task')">✓ Úkol</button></div></div>
       <div class="form-row"><div class="form-group"><label>Hodiny *</label><input type="number" id="entryHours" placeholder="8" step="0.5" min="0" max="24" inputmode="decimal"></div><div class="form-group" id="stringsGroup"><label>Stringy</label><input type="number" id="entryStrings" placeholder="0" min="0" inputmode="numeric"></div></div>
       <div class="form-group"><label>Čísla stolů</label><input type="text" id="entryTables" placeholder="3E42, 2E80-1"></div>
+      <div class="form-group"><label>Poznámka</label><input type="text" id="entryNote" placeholder="volitelné – počasí, porucha..."></div>
       <button class="btn btn-primary btn-full mt-8" id="btnSaveEntry" onclick="saveEntry()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Uložit</button>
     </div>
   </div>
@@ -177,6 +188,7 @@
       <div class="batch-header-controls"><div class="form-group" style="flex:1"><label>Datum</label><input type="date" id="batchDate"></div><div class="form-group" style="flex:1"><label>Typ</label><div class="work-type-toggle"><button class="work-type-btn active-hourly" id="batchBtnHourly" onclick="setBatchWorkType('hourly')">⏱</button><button class="work-type-btn" id="batchBtnTask" onclick="setBatchWorkType('task')">✓</button></div></div></div>
       <div class="batch-presets"><label>Všem:</label><div class="chip-row"><button class="chip" onclick="batchFillAllHours(8)">8h</button><button class="chip" onclick="batchFillAllHours(10)">10h</button><button class="chip" onclick="batchFillAllHours(12)">12h</button><button class="chip" onclick="batchClearAll()">✕</button></div></div>
       <div id="batchEmployeeList" class="batch-employee-list"></div>
+      <div class="form-group mt-8"><label>Poznámka pro celý den</label><input type="text" id="batchNote" placeholder="volitelné – počasí, pozn."></div>
       <div class="batch-footer"><div class="batch-summary" id="batchSummary">0 záznamů</div><button class="btn btn-primary btn-full" onclick="saveBatchEntries()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Uložit vše</button></div>
     </div>
   </div>

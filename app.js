@@ -53,8 +53,15 @@ function showConfirm(title, msg, fn) {
 function closeConfirm() { document.getElementById('confirmOverlay').classList.remove('show'); }
 
 // ---- NAVIGATION ----
+let navHistory = ['pageDashboard'];
+
 function openPage(pageId) {
   if (pageId === 'settings') pageId = 'pageSettings';
+  const currentPage = document.querySelector('.page.active');
+  const currentId = currentPage ? currentPage.id : 'pageDashboard';
+  if (currentId !== pageId && navHistory[navHistory.length - 1] !== currentId) {
+    navHistory.push(currentId);
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const t = document.getElementById(pageId);
   if (t) t.classList.add('active');
@@ -65,6 +72,23 @@ function openPage(pageId) {
   if (pageId === 'pageEmployees' && currentProject) loadEmployees();
   if (pageId === 'pageSettings') { loadProjectList(); populateExportSelects(); }
   if (pageId === 'pageSearch') initSearchPage();
+  // Show/hide back button
+  const backBtn = document.getElementById('backBtn');
+  const mainPages = ['pageDashboard'];
+  if (backBtn) backBtn.style.display = mainPages.includes(pageId) ? 'none' : 'flex';
+}
+
+function goBack() {
+  if (navHistory.length > 0) {
+    const prev = navHistory.pop();
+    openPage(prev);
+    // Remove the duplicate push that openPage just did
+    if (navHistory.length > 1 && navHistory[navHistory.length - 1] === navHistory[navHistory.length - 2]) {
+      navHistory.pop();
+    }
+  } else {
+    openPage('pageDashboard');
+  }
 }
 
 // ---- PROJECTS ----
@@ -147,6 +171,24 @@ async function loadWeekSummary() {
   document.getElementById('weekHours').textContent=h.toFixed(1)+'h';
   document.getElementById('weekStrings').textContent=s+'s';
   el.style.display='block';
+
+  // Porovnání s minulým týdnem
+  const cmpEl=document.getElementById('weekCompare');
+  const prevMon=new Date(w.from); prevMon.setDate(prevMon.getDate()-7);
+  const prevSun=new Date(prevMon); prevSun.setDate(prevMon.getDate()+6);
+  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const prevEntries=await getEntries(currentProject,fmt(prevMon),fmt(prevSun));
+  if (!prevEntries.length) { cmpEl.style.display='none'; return; }
+  let pH=0,pS=0; const pD=new Set();
+  prevEntries.forEach(e=>{pD.add(e.date);pH+=e.hours;pS+=e.strings});
+  const deltaH=h-pH, deltaS=s-pS;
+  const fmtDelta=(v,unit)=>{
+    const cls=v>0?'up':v<0?'down':'same';
+    const sign=v>0?'+':'';
+    return `<span class="delta ${cls}">${sign}${v.toFixed(v%1?1:0)}${unit}</span>`;
+  };
+  cmpEl.innerHTML=`vs minulý týden: ${fmtDelta(deltaH,'h')} ${fmtDelta(deltaS,'s')}`;
+  cmpEl.style.display='flex';
 }
 
 async function populateDashFilter() {
@@ -194,8 +236,9 @@ function renderEntryGroups(entries, empMap, highlightText) {
       const isH=entry.workType==='hourly';
       let name=escHtml(empMap[entry.employeeId]||'Neznámý');
       let tables=entry.tables?escHtml(entry.tables):'';
-      if (highlightText) { name=hlText(name,highlightText); tables=hlText(tables,highlightText); }
-      html+=`<div class="card entry-card ${isH?'hourly':'task'}"><div class="entry-header"><span class="entry-name">${name}</span><span class="badge ${isH?'badge-hourly':'badge-task'}">${isH?'⏱ Hod.':'✓ Úkol'}</span></div><div class="entry-meta"><div class="entry-meta-item"><strong>${entry.hours}h</strong></div>${entry.strings>0?`<div class="entry-meta-item"><strong>${entry.strings}s</strong></div>`:''}</div>${entry.tables?`<div class="entry-tables">🔧 ${tables}</div>`:''}
+      let note=entry.note?escHtml(entry.note):'';
+      if (highlightText) { name=hlText(name,highlightText); tables=hlText(tables,highlightText); if(note)note=hlText(note,highlightText); }
+      html+=`<div class="card entry-card ${isH?'hourly':'task'}"><div class="entry-header"><span class="entry-name">${name}</span><span class="badge ${isH?'badge-hourly':'badge-task'}">${isH?'⏱ Hod.':'✓ Úkol'}</span></div><div class="entry-meta"><div class="entry-meta-item"><strong>${entry.hours}h</strong></div>${entry.strings>0?`<div class="entry-meta-item"><strong>${entry.strings}s</strong></div>`:''}</div>${entry.tables?`<div class="entry-tables">🔧 ${tables}</div>`:''}${entry.note?`<div class="entry-note">💬 ${note}</div>`:''}
 <div class="entry-actions"><button class="btn btn-sm btn-ghost" onclick="editEntry('${entry.id}')">Upravit</button><button class="btn btn-sm btn-danger" onclick="deleteEntryConfirm('${entry.id}')">Smazat</button></div></div>`;
     });
     html+='</div>';
@@ -223,6 +266,7 @@ async function openNewEntry() {
   document.getElementById('entryHours').value='';
   document.getElementById('entryStrings').value='';
   document.getElementById('entryTables').value='';
+  document.getElementById('entryNote').value='';
   setWorkType('hourly');
   document.getElementById('modalEntry').classList.add('show');
 }
@@ -240,6 +284,7 @@ async function editEntry(id) {
   document.getElementById('entryHours').value=entry.hours;
   document.getElementById('entryStrings').value=entry.strings||'';
   document.getElementById('entryTables').value=entry.tables||'';
+  document.getElementById('entryNote').value=entry.note||'';
   setWorkType(entry.workType);
   document.getElementById('modalEntry').classList.add('show');
 }
@@ -255,10 +300,11 @@ async function saveEntry() {
   const empId=document.getElementById('entryEmployee').value, date=document.getElementById('entryDate').value;
   const hours=document.getElementById('entryHours').value, strings=document.getElementById('entryStrings').value;
   const tables=document.getElementById('entryTables').value;
+  const note=document.getElementById('entryNote').value;
   if (!empId) { showToast('Vyber zaměstnance!',true); return; }
   if (!date) { showToast('Zadej datum!',true); return; }
   if (!hours||parseFloat(hours)<=0) { showToast('Zadej hodiny!',true); return; }
-  const data={projectId:currentProject,employeeId:empId,date,hours:parseFloat(hours),strings:currentWorkType==='task'?(parseInt(strings)||0):0,tables:tables.trim(),workType:currentWorkType};
+  const data={projectId:currentProject,employeeId:empId,date,hours:parseFloat(hours),strings:currentWorkType==='task'?(parseInt(strings)||0):0,tables:tables.trim(),note:note.trim(),workType:currentWorkType};
   try {
     if (editingEntryId) { const es=await getAllEntries(currentProject),ex=es.find(e=>e.id===editingEntryId); if(ex){Object.assign(ex,data);await updateEntry(ex);} showToast('Aktualizováno'); }
     else { await addEntry(data); showToast('Uloženo ✓'); }
@@ -309,8 +355,9 @@ function updateBatchSummary() {
 
 async function saveBatchEntries() {
   const date=document.getElementById('batchDate').value; if(!date){showToast('Datum!',true);return;}
+  const batchNote=(document.getElementById('batchNote').value||'').trim();
   const toSave=[];
-  document.querySelectorAll('.batch-row').forEach(r=>{const id=r.dataset.empid,h=parseFloat(document.getElementById('bh_'+id).value)||0,s=parseInt(document.getElementById('bs_'+id).value)||0,t=document.getElementById('bt_'+id).value.trim(),wt=r.dataset.worktype||batchWorkType;if(h>0)toSave.push({projectId:currentProject,employeeId:id,date,hours:h,strings:wt==='task'?s:0,tables:t,workType:wt})});
+  document.querySelectorAll('.batch-row').forEach(r=>{const id=r.dataset.empid,h=parseFloat(document.getElementById('bh_'+id).value)||0,s=parseInt(document.getElementById('bs_'+id).value)||0,t=document.getElementById('bt_'+id).value.trim(),wt=r.dataset.worktype||batchWorkType;if(h>0)toSave.push({projectId:currentProject,employeeId:id,date,hours:h,strings:wt==='task'?s:0,tables:t,note:batchNote,workType:wt})});
   if (!toSave.length) { showToast('Zadej hodiny!',true); return; }
   for (const e of toSave) await addEntry(e);
   showToast(`${toSave.length} uloženo ✓`); closeBatchModal(); loadDashboard();
@@ -403,9 +450,10 @@ async function executeSearch() {
     if (query) {
       const name=(empMap[e.employeeId]||'').toLowerCase();
       const tables=(e.tables||'').toLowerCase();
+      const note=(e.note||'').toLowerCase();
       const date=e.date;
       const fDate=formatDate(e.date).toLowerCase();
-      if (!name.includes(query) && !tables.includes(query) && !date.includes(query) && !fDate.includes(query) && !String(e.hours).includes(query) && !String(e.strings).includes(query)) return false;
+      if (!name.includes(query) && !tables.includes(query) && !note.includes(query) && !date.includes(query) && !fDate.includes(query) && !String(e.hours).includes(query) && !String(e.strings).includes(query)) return false;
     }
     return true;
   });
@@ -435,9 +483,9 @@ async function exportSearchResults() {
   const projects=await getProjects(), proj=projects.find(p=>p.id===currentProject);
   const emps=await getEmployees(currentProject), empMap={};
   emps.forEach(e=>empMap[e.id]=e.name);
-  let csv='Projekt;Datum;Jméno;Hodiny;Stringy;Typ práce;Stoly\n';
+  let csv='Projekt;Datum;Jméno;Hodiny;Stringy;Typ práce;Stoly;Poznámka\n';
   lastSearchResults.forEach(e=>{
-    csv+=[proj?proj.name:'',e.date,empMap[e.employeeId]||'',e.hours,e.strings,e.workType==='hourly'?'Hodinovka':'Úkol/Stringy','"'+(e.tables||'').replace(/"/g,'""')+'"'].join(';')+'\n';
+    csv+=[proj?proj.name:'',e.date,empMap[e.employeeId]||'',e.hours,e.strings,e.workType==='hourly'?'Hodinovka':'Úkol/Stringy','"'+(e.tables||'').replace(/"/g,'""')+'"','"'+(e.note||'').replace(/"/g,'""')+'"'].join(';')+'\n';
   });
   downloadCSV(csv,`SolarTrack_hledani_${todayStr()}.csv`);
   showToast('CSV exportováno ✓');
@@ -453,6 +501,7 @@ async function loadStats() {
   document.getElementById('statDays').textContent=stats.workDaysCount;
   document.getElementById('statAvg').textContent=stats.avgHoursPerDay;
   await loadEmployeeStats(month);
+  await loadAttendanceTable(month);
   await populateExportSelects();
   await renderCharts(currentProject,month);
 }
@@ -480,6 +529,85 @@ async function populateExportSelects() {
     emps.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;sel.appendChild(o)});
     if(cur)sel.value=cur;
   });
+}
+
+// ---- ATTENDANCE TABLE ----
+async function loadAttendanceTable(month) {
+  const c=document.getElementById('attendanceContainer');
+  if (!month) {
+    // Bez měsíce defaultnout na aktuální
+    month = currentMonthStr();
+  }
+
+  const emps=await getEmployees(currentProject);
+  const y=parseInt(month.split('-')[0]), m=parseInt(month.split('-')[1]);
+  const daysInMonth=new Date(y,m,0).getDate();
+  const from=month+'-01', to=month+'-'+String(daysInMonth).padStart(2,'0');
+  const entries=await getEntries(currentProject,from,to);
+
+  if (!emps.length||!entries.length) {
+    c.innerHTML='<p class="text-sm text-muted text-center" style="padding:14px">Žádná data pro tabulku</p>';
+    return;
+  }
+
+  // Build lookup: empId -> {day: hours}
+  const data={};
+  emps.forEach(e=>{data[e.id]={name:e.name,days:{},total:0}});
+  entries.forEach(e=>{
+    if(!data[e.employeeId])return;
+    const day=parseInt(e.date.split('-')[2]);
+    data[e.employeeId].days[day]=(data[e.employeeId].days[day]||0)+e.hours;
+    data[e.employeeId].total+=e.hours;
+  });
+
+  // Filter only employees with data
+  const active=Object.entries(data).filter(([,d])=>d.total>0).sort((a,b)=>b[1].total-a[1].total);
+  if (!active.length) { c.innerHTML='<p class="text-sm text-muted text-center" style="padding:14px">Žádná data</p>'; return; }
+
+  // Day totals
+  const dayTotals={};
+  for (let d=1;d<=daysInMonth;d++) {
+    dayTotals[d]=active.reduce((s,[,emp])=>s+(emp.days[d]||0),0);
+  }
+
+  // Weekday names
+  const wdNames=['Ne','Po','Út','St','Čt','Pá','So'];
+
+  let html='<table class="attendance-table"><thead><tr><th></th>';
+  for (let d=1;d<=daysInMonth;d++) {
+    const wd=new Date(y,m-1,d).getDay();
+    const isWe=wd===0||wd===6;
+    html+=`<th class="day-header-cell${isWe?' att-weekend':''}">${d}<br><span style="font-weight:400;opacity:.5">${wdNames[wd]}</span></th>`;
+  }
+  html+='<th>Σ</th></tr></thead><tbody>';
+
+  active.forEach(([,emp])=>{
+    const firstName=emp.name.split(' ')[0];
+    html+=`<tr><th>${escHtml(firstName)}</th>`;
+    for (let d=1;d<=daysInMonth;d++) {
+      const h=emp.days[d]||0;
+      const wd=new Date(y,m-1,d).getDay();
+      const isWe=wd===0||wd===6;
+      let cls='att-val';
+      if (isWe) cls+=' att-weekend';
+      if (h===0) cls+=' zero';
+      else if (h>=8) cls+=' high-hours';
+      else cls+=' has-hours';
+      html+=`<td class="${cls}">${h>0?h:''}</td>`;
+    }
+    html+=`<td class="att-val high-hours">${emp.total.toFixed(emp.total%1?1:0)}</td></tr>`;
+  });
+
+  html+='</tbody><tfoot><tr><th>Σ</th>';
+  let grandTotal=0;
+  for (let d=1;d<=daysInMonth;d++) {
+    const t=dayTotals[d];
+    grandTotal+=t;
+    html+=`<td>${t>0?t.toFixed(t%1?1:0):''}</td>`;
+  }
+  html+=`<td>${grandTotal.toFixed(grandTotal%1?1:0)}</td></tr></tfoot></table>`;
+
+  c.innerHTML=html;
 }
 
 // ---- EXPORT ----
