@@ -6,345 +6,196 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SolarTrack">
-  <meta name="theme-color" content="#0a0e1a">
+  <meta name="theme-color" content="#050a18">
   <meta name="description" content="Evidence práce na solárních polích">
-
   <title>SolarTrack</title>
-
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-
-  <!-- TOAST -->
+  <div class="bg-mesh"></div>
   <div class="toast" id="toast"></div>
 
-  <!-- CONFIRM DIALOG -->
   <div class="confirm-overlay" id="confirmOverlay">
-    <div class="confirm-box">
+    <div class="glass confirm-box">
       <h3 id="confirmTitle">Potvrdit</h3>
       <p id="confirmMessage">Opravdu chcete pokračovat?</p>
       <div class="confirm-actions">
-        <button class="btn btn-secondary" onclick="closeConfirm()">Zrušit</button>
-        <button class="btn btn-danger" id="confirmBtn" onclick="">Smazat</button>
+        <button class="btn btn-ghost" onclick="closeConfirm()">Zrušit</button>
+        <button class="btn btn-danger" id="confirmBtn">Smazat</button>
       </div>
     </div>
   </div>
 
-  <!-- HEADER -->
-  <header class="app-header">
+  <header class="app-header glass-bar">
     <div class="header-top">
       <div class="app-logo">
         <div class="logo-icon">☀️</div>
-        <div>
-          <div class="app-title">SolarTrack</div>
-          <div class="app-subtitle">Evidence práce</div>
-        </div>
+        <div><div class="app-title">SolarTrack</div><div class="app-subtitle">Evidence práce</div></div>
       </div>
-      <button class="btn btn-sm btn-secondary" onclick="openPage('settings')" title="Nastavení">
+      <button class="btn-round glass-btn" onclick="openPage('pageSettings')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
     <div class="header-project" id="headerProject" style="display:none">
-      <select id="projectSelect" onchange="onProjectChange()">
-        <option value="">Vyber projekt...</option>
-      </select>
+      <select id="projectSelect" onchange="onProjectChange()"><option value="">Vyber projekt...</option></select>
     </div>
   </header>
 
-  <!-- ============ STRÁNKA: ZÁZNAMY ============ -->
+  <!-- PAGE: ZÁZNAMY -->
   <div class="page active" id="pageDashboard">
-    <!-- Týdenní souhrn -->
-    <div class="week-summary" id="weekSummary" style="display:none">
-      <div class="week-summary-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Tento týden
-      </div>
-      <div class="week-summary-stats">
-        <span id="weekDays">0 dnů</span>
-        <span class="week-divider">·</span>
-        <span id="weekHours">0h</span>
-        <span class="week-divider">·</span>
-        <span id="weekStrings">0s</span>
-      </div>
+    <div class="week-summary glass" id="weekSummary" style="display:none">
+      <div class="ws-title">📅 Tento týden</div>
+      <div class="ws-stats"><span id="weekDays">0 dnů</span><span class="dot">·</span><span id="weekHours">0h</span><span class="dot">·</span><span id="weekStrings">0s</span></div>
     </div>
-
-    <!-- Filtr podle zaměstnance -->
     <div class="dash-filter" id="dashFilter" style="display:none">
-      <select id="dashEmployeeFilter" onchange="loadDashboard()">
-        <option value="">Všichni zaměstnanci</option>
-      </select>
+      <select id="dashEmployeeFilter" onchange="loadDashboard()"><option value="">Všichni zaměstnanci</option></select>
     </div>
-
     <div id="dashboardContent"></div>
   </div>
 
-  <!-- ============ STRÁNKA: PŘEHLEDY ============ -->
-  <div class="page" id="pageStats">
-    <h2 class="page-title">📊 Přehledy</h2>
-
-    <div class="month-picker">
-      <label style="margin:0;white-space:nowrap">Měsíc:</label>
-      <input type="month" id="statsMonth" onchange="loadStats()">
-      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('statsMonth').value='';loadStats()">Vše</button>
+  <!-- PAGE: HLEDAT -->
+  <div class="page" id="pageSearch">
+    <div class="search-bar glass">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Hledej cokoli..." oninput="onSearchInput()" enterkeyhint="search">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
     </div>
-
-    <div class="stats-grid" id="statsGrid">
-      <div class="stat-card">
-        <div class="stat-value blue" id="statHours">0</div>
-        <div class="stat-label">Celkem hodin</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value amber" id="statStrings">0</div>
-        <div class="stat-label">Celkem stringů</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value green" id="statDays">0</div>
-        <div class="stat-label">Pracovních dnů</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value blue" id="statAvg">0</div>
-        <div class="stat-label">Ø hodin / den</div>
-      </div>
-    </div>
-
-    <!-- Přehled po zaměstnancích -->
-    <div class="section-header">
-      <h3 class="section-title">👷 Přehled po zaměstnancích</h3>
-    </div>
-    <div id="employeeStatsContainer"></div>
-
-    <!-- Grafy -->
-    <div class="section-header mt-16">
-      <h3 class="section-title">📈 Grafy</h3>
-    </div>
-
-    <div class="chart-container">
-      <div class="chart-title">Hodiny / den</div>
-      <div class="chart-wrapper"><canvas id="chartHours"></canvas></div>
-    </div>
-
-    <div class="chart-container">
-      <div class="chart-title">Stringy / den</div>
-      <div class="chart-wrapper"><canvas id="chartStrings"></canvas></div>
-    </div>
-
-    <div class="chart-container">
-      <div class="chart-title">Hodinovka vs Úkol</div>
-      <div class="chart-wrapper"><canvas id="chartComparison"></canvas></div>
-    </div>
-
-    <!-- Export po zaměstnancích -->
-    <div class="section-header mt-16">
-      <h3 class="section-title">📤 Export</h3>
-    </div>
-
-    <div class="form-group">
-      <label>Zaměstnanec (prázdné = všichni)</label>
-      <select id="exportEmployee">
-        <option value="">Všichni zaměstnanci</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Měsíc (prázdné = celý projekt)</label>
-      <input type="month" id="exportMonthStats">
-    </div>
-    <button class="btn btn-green btn-full" onclick="doExportFromStats()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Stáhnout CSV
+    <button class="filter-toggle" id="filterToggle" onclick="toggleFilters()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      Filtry <span class="filter-badge" id="filterCount" style="display:none">0</span>
     </button>
-  </div>
-
-  <!-- ============ STRÁNKA: ZAMĚSTNANCI ============ -->
-  <div class="page" id="pageEmployees">
-    <h2 class="page-title">👷 Zaměstnanci</h2>
-    <div class="inline-add">
-      <input type="text" id="newEmployeeName" placeholder="Jméno zaměstnance" enterkeyhint="done">
-      <button class="btn btn-primary btn-icon" onclick="addNewEmployee()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <div class="search-filters glass" id="searchFilters" style="display:none">
+      <div class="form-group"><label>Zaměstnanec</label><select id="searchEmployee"><option value="">Všichni</option></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Datum od</label><input type="date" id="searchDateFrom"></div>
+        <div class="form-group"><label>Datum do</label><input type="date" id="searchDateTo"></div>
+      </div>
+      <div class="form-group">
+        <label>Typ práce</label>
+        <div class="chip-row"><button class="chip chip-active" data-stype="all" onclick="setSearchType('all')">Vše</button><button class="chip" data-stype="hourly" onclick="setSearchType('hourly')">⏱ Hodinovka</button><button class="chip" data-stype="task" onclick="setSearchType('task')">✓ Úkol</button></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Min hodin</label><input type="number" id="searchHoursMin" placeholder="0" min="0" step="0.5" inputmode="decimal"></div>
+        <div class="form-group"><label>Max hodin</label><input type="number" id="searchHoursMax" placeholder="24" min="0" step="0.5" inputmode="decimal"></div>
+      </div>
+      <div class="flex gap-8 mt-8">
+        <button class="btn btn-ghost btn-full btn-sm" onclick="clearFilters()">Vymazat</button>
+        <button class="btn btn-primary btn-full btn-sm" onclick="executeSearch()">Hledat</button>
+      </div>
+    </div>
+    <div class="search-summary glass" id="searchSummary" style="display:none"></div>
+    <div id="searchResults"></div>
+    <div id="searchExport" style="display:none">
+      <button class="btn btn-green btn-full mt-8" onclick="exportSearchResults()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export výsledků CSV
       </button>
     </div>
+  </div>
+
+  <!-- PAGE: PŘEHLEDY -->
+  <div class="page" id="pageStats">
+    <h2 class="page-title">📊 Přehledy</h2>
+    <div class="month-picker"><label style="margin:0;white-space:nowrap">Měsíc:</label><input type="month" id="statsMonth" onchange="loadStats()"><button class="btn btn-sm btn-ghost" onclick="document.getElementById('statsMonth').value='';loadStats()">Vše</button></div>
+    <div class="stats-grid">
+      <div class="glass stat-card"><div class="stat-value blue" id="statHours">0</div><div class="stat-label">Celkem hodin</div></div>
+      <div class="glass stat-card"><div class="stat-value amber" id="statStrings">0</div><div class="stat-label">Celkem stringů</div></div>
+      <div class="glass stat-card"><div class="stat-value green" id="statDays">0</div><div class="stat-label">Pracovních dnů</div></div>
+      <div class="glass stat-card"><div class="stat-value blue" id="statAvg">0</div><div class="stat-label">Ø hodin / den</div></div>
+    </div>
+    <div class="section-header"><h3 class="section-title">👷 Po zaměstnancích</h3></div>
+    <div id="employeeStatsContainer"></div>
+    <div class="section-header mt-16"><h3 class="section-title">📈 Grafy</h3></div>
+    <div class="glass chart-container"><div class="chart-title">Hodiny / den</div><div class="chart-wrapper"><canvas id="chartHours"></canvas></div></div>
+    <div class="glass chart-container"><div class="chart-title">Stringy / den</div><div class="chart-wrapper"><canvas id="chartStrings"></canvas></div></div>
+    <div class="glass chart-container"><div class="chart-title">Hodinovka vs Úkol</div><div class="chart-wrapper"><canvas id="chartComparison"></canvas></div></div>
+    <div class="section-header mt-16"><h3 class="section-title">📤 Export</h3></div>
+    <div class="form-group"><label>Zaměstnanec</label><select id="exportEmployee"><option value="">Všichni</option></select></div>
+    <div class="form-group"><label>Měsíc</label><input type="month" id="exportMonthStats"></div>
+    <button class="btn btn-green btn-full" onclick="doExportFromStats()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV</button>
+  </div>
+
+  <!-- PAGE: TÝM -->
+  <div class="page" id="pageEmployees">
+    <h2 class="page-title">👷 Zaměstnanci</h2>
+    <div class="inline-add"><input type="text" id="newEmployeeName" placeholder="Jméno zaměstnance" enterkeyhint="done"><button class="btn btn-primary btn-icon" onclick="addNewEmployee()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
     <div id="employeeList"></div>
   </div>
 
-  <!-- ============ STRÁNKA: NASTAVENÍ ============ -->
+  <!-- PAGE: NASTAVENÍ -->
   <div class="page" id="pageSettings">
     <h2 class="page-title">⚙️ Nastavení</h2>
-
-    <h3 style="font-size:15px;margin-bottom:12px;color:var(--text-secondary)">Projekty</h3>
-    <div class="inline-add">
-      <input type="text" id="newProjectName" placeholder="Název projektu" enterkeyhint="done">
-      <button class="btn btn-primary btn-icon" onclick="addNewProject()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
-    </div>
+    <h3 class="section-title mb-8">Projekty</h3>
+    <div class="inline-add"><input type="text" id="newProjectName" placeholder="Název projektu" enterkeyhint="done"><button class="btn btn-primary btn-icon" onclick="addNewProject()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
     <div id="projectList"></div>
-
     <div class="export-section">
-      <h3 style="font-size:15px;margin-bottom:12px;color:var(--text-secondary)">Export dat</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Měsíc</label>
-          <input type="month" id="exportMonth">
-        </div>
-        <div class="form-group">
-          <label>Zaměstnanec</label>
-          <select id="exportEmployeeSettings">
-            <option value="">Všichni</option>
-          </select>
-        </div>
-      </div>
-      <button class="btn btn-green btn-full mt-8" onclick="doExport()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Stáhnout CSV
-      </button>
+      <h3 class="section-title mb-8">Export dat</h3>
+      <div class="form-row"><div class="form-group"><label>Měsíc</label><input type="month" id="exportMonth"></div><div class="form-group"><label>Zaměstnanec</label><select id="exportEmployeeSettings"><option value="">Všichni</option></select></div></div>
+      <button class="btn btn-green btn-full mt-8" onclick="doExport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> CSV</button>
     </div>
 
-    <div style="margin-top:32px;padding-top:16px;border-top:1px solid var(--border)">
-      <p class="text-sm text-muted text-center">SolarTrack v1.0</p>
-      <p class="text-sm text-muted text-center">Data uložena lokálně v zařízení</p>
-      <p class="text-sm text-muted text-center" style="margin-top:4px">Offline-first PWA</p>
-    </div>
-  </div>
-
-  <!-- ============ MODAL: NOVÝ ZÁZNAM ============ -->
-  <div class="modal-overlay" id="modalEntry" onclick="closeModalOnBg(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-      <div class="modal-handle"></div>
-      <div class="modal-title" id="modalEntryTitle">Nový záznam</div>
-
-      <div class="form-group">
-        <label>Zaměstnanec</label>
-        <select id="entryEmployee">
-          <option value="">Vyber zaměstnance...</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Datum</label>
-        <input type="date" id="entryDate">
-      </div>
-
-      <div class="form-group">
-        <label>Typ práce</label>
-        <div class="work-type-toggle">
-          <button class="work-type-btn active-hourly" id="btnHourly" onclick="setWorkType('hourly')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Hodinovka
-          </button>
-          <button class="work-type-btn" id="btnTask" onclick="setWorkType('task')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            Úkol / Stringy
-          </button>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label>Hodiny *</label>
-          <input type="number" id="entryHours" placeholder="8" step="0.5" min="0" max="24" inputmode="decimal">
-        </div>
-        <div class="form-group" id="stringsGroup">
-          <label>Stringy</label>
-          <input type="number" id="entryStrings" placeholder="0" min="0" inputmode="numeric">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Čísla stolů</label>
-        <input type="text" id="entryTables" placeholder="např. 3E42, 2E80-1">
-      </div>
-
-      <button class="btn btn-primary btn-full mt-8" id="btnSaveEntry" onclick="saveEntry()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        Uložit záznam
-      </button>
-    </div>
-  </div>
-
-  <!-- ============ MODAL: HROMADNÉ ZADÁNÍ ============ -->
-  <div class="modal-overlay" id="modalBatch" onclick="closeBatchOnBg(event)">
-    <div class="modal-content modal-batch" onclick="event.stopPropagation()">
-      <div class="modal-handle"></div>
-      <div class="modal-title">⚡ Hromadné zadání dne</div>
-
-      <!-- Datum a typ nahoře -->
-      <div class="batch-header-controls">
-        <div class="form-group" style="flex:1">
-          <label>Datum</label>
-          <input type="date" id="batchDate">
-        </div>
-        <div class="form-group" style="flex:1">
-          <label>Výchozí typ</label>
-          <div class="work-type-toggle">
-            <button class="work-type-btn active-hourly" id="batchBtnHourly" onclick="setBatchWorkType('hourly')">
-              ⏱ Hod.
-            </button>
-            <button class="work-type-btn" id="batchBtnTask" onclick="setBatchWorkType('task')">
-              ✓ Úkol
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Rychlé hodiny preset -->
-      <div class="batch-presets">
-        <label>Rychle všem:</label>
-        <div class="preset-chips">
-          <button class="chip" onclick="batchFillAllHours(8)">8h</button>
-          <button class="chip" onclick="batchFillAllHours(10)">10h</button>
-          <button class="chip" onclick="batchFillAllHours(12)">12h</button>
-          <button class="chip" onclick="batchClearAll()">Vymazat</button>
-        </div>
-      </div>
-
-      <!-- Seznam zaměstnanců -->
-      <div id="batchEmployeeList" class="batch-employee-list">
-        <!-- Dynamicky generované řádky -->
-      </div>
-
-      <div class="batch-footer">
-        <div class="batch-summary" id="batchSummary">0 záznamů k uložení</div>
-        <button class="btn btn-primary btn-full" onclick="saveBatchEntries()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Uložit vše
+    <!-- ZÁLOHA / OBNOVA -->
+    <div class="backup-section">
+      <h3 class="section-title mb-8">💾 Záloha dat</h3>
+      <p class="text-sm text-muted" style="margin-bottom:12px">Záloha uloží všechny projekty, zaměstnance a záznamy do JSON souboru. Při obnově se stávající data nahradí.</p>
+      <div class="flex gap-8">
+        <button class="btn btn-primary btn-full" onclick="doBackup()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Záloha
+        </button>
+        <button class="btn btn-ghost btn-full" onclick="document.getElementById('restoreFile').click()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Obnovit
         </button>
       </div>
+      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="doRestore(this)">
+    </div>
+
+    <div class="app-footer"><p>SolarTrack v2.0 · Offline-first PWA</p><p class="text-muted">Data uložena lokálně</p></div>
+  </div>
+
+  <!-- MODALS -->
+  <div class="modal-overlay" id="modalEntry" onclick="closeModalOnBg(event)">
+    <div class="modal-content glass" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="modalEntryTitle">Nový záznam</div>
+      <div class="form-group"><label>Zaměstnanec</label><select id="entryEmployee"><option value="">Vyber...</option></select></div>
+      <div class="form-group"><label>Datum</label><input type="date" id="entryDate"></div>
+      <div class="form-group"><label>Typ práce</label><div class="work-type-toggle"><button class="work-type-btn active-hourly" id="btnHourly" onclick="setWorkType('hourly')">⏱ Hodinovka</button><button class="work-type-btn" id="btnTask" onclick="setWorkType('task')">✓ Úkol</button></div></div>
+      <div class="form-row"><div class="form-group"><label>Hodiny *</label><input type="number" id="entryHours" placeholder="8" step="0.5" min="0" max="24" inputmode="decimal"></div><div class="form-group" id="stringsGroup"><label>Stringy</label><input type="number" id="entryStrings" placeholder="0" min="0" inputmode="numeric"></div></div>
+      <div class="form-group"><label>Čísla stolů</label><input type="text" id="entryTables" placeholder="3E42, 2E80-1"></div>
+      <button class="btn btn-primary btn-full mt-8" id="btnSaveEntry" onclick="saveEntry()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Uložit</button>
     </div>
   </div>
 
-  <!-- FAB GROUP -->
-  <div class="fab-group" id="fabGroup" style="display:none">
-    <button class="fab-mini" id="fabSingle" onclick="openNewEntry()" title="Jeden záznam">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-    </button>
-    <button class="fab" id="fabAdd" onclick="openBatchEntry()" title="Hromadné zadání dne">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </button>
+  <div class="modal-overlay" id="modalBatch" onclick="closeBatchOnBg(event)">
+    <div class="modal-content glass modal-batch" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-title">⚡ Hromadné zadání</div>
+      <div class="batch-header-controls"><div class="form-group" style="flex:1"><label>Datum</label><input type="date" id="batchDate"></div><div class="form-group" style="flex:1"><label>Typ</label><div class="work-type-toggle"><button class="work-type-btn active-hourly" id="batchBtnHourly" onclick="setBatchWorkType('hourly')">⏱</button><button class="work-type-btn" id="batchBtnTask" onclick="setBatchWorkType('task')">✓</button></div></div></div>
+      <div class="batch-presets"><label>Všem:</label><div class="chip-row"><button class="chip" onclick="batchFillAllHours(8)">8h</button><button class="chip" onclick="batchFillAllHours(10)">10h</button><button class="chip" onclick="batchFillAllHours(12)">12h</button><button class="chip" onclick="batchClearAll()">✕</button></div></div>
+      <div id="batchEmployeeList" class="batch-employee-list"></div>
+      <div class="batch-footer"><div class="batch-summary" id="batchSummary">0 záznamů</div><button class="btn btn-primary btn-full" onclick="saveBatchEntries()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Uložit vše</button></div>
+    </div>
   </div>
 
-  <!-- BOTTOM NAV -->
-  <nav class="bottom-nav">
-    <button class="nav-btn active" data-page="pageDashboard" onclick="openPage('pageDashboard')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Záznamy
-    </button>
-    <button class="nav-btn" data-page="pageStats" onclick="openPage('pageStats')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Přehledy
-    </button>
-    <button class="nav-btn" data-page="pageEmployees" onclick="openPage('pageEmployees')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Tým
-    </button>
-    <button class="nav-btn" data-page="pageSettings" onclick="openPage('pageSettings')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Nastavení
-    </button>
+  <!-- FAB -->
+  <div class="fab-group" id="fabGroup" style="display:none">
+    <button class="fab-mini glass-btn" onclick="openNewEntry()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></button>
+    <button class="fab" onclick="openBatchEntry()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+  </div>
+
+  <!-- NAV -->
+  <nav class="bottom-nav glass-bar">
+    <button class="nav-btn active" data-page="pageDashboard" onclick="openPage('pageDashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Záznamy</span></button>
+    <button class="nav-btn" data-page="pageSearch" onclick="openPage('pageSearch')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span>Hledat</span></button>
+    <button class="nav-btn" data-page="pageStats" onclick="openPage('pageStats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Přehledy</span></button>
+    <button class="nav-btn" data-page="pageEmployees" onclick="openPage('pageEmployees')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Tým</span></button>
+    <button class="nav-btn" data-page="pageSettings" onclick="openPage('pageSettings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg><span>Více</span></button>
   </nav>
 
-  <!-- SKRIPTY - relativní cesty -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="./db.js"></script>
   <script src="./charts.js"></script>

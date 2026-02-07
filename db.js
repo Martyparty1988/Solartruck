@@ -261,3 +261,107 @@ function downloadCSV(csv, filename) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// ---- ZÁLOHA / OBNOVA ----
+
+function getAllFromStore(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function createBackup() {
+  const projects = await getAllFromStore('projects');
+  const employees = await getAllFromStore('employees');
+  const entries = await getAllFromStore('entries');
+
+  const backup = {
+    version: 2,
+    app: 'SolarTrack',
+    created: new Date().toISOString(),
+    data: { projects, employees, entries },
+    stats: {
+      projects: projects.length,
+      employees: employees.length,
+      entries: entries.length
+    }
+  };
+
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.download = `SolarTrack_backup_${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  return backup.stats;
+}
+
+async function restoreBackup(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const backup = JSON.parse(e.target.result);
+
+        // Validace
+        if (!backup.data || !backup.data.projects || !backup.data.employees || !backup.data.entries) {
+          reject('Neplatný soubor zálohy – chybí data.');
+          return;
+        }
+
+        if (backup.app && backup.app !== 'SolarTrack') {
+          reject('Soubor není záloha SolarTrack.');
+          return;
+        }
+
+        // Vyčistit stávající data
+        const clearStore = (storeName) => new Promise((res, rej) => {
+          const tx = db.transaction(storeName, 'readwrite');
+          const req = tx.objectStore(storeName).clear();
+          req.onsuccess = () => res();
+          req.onerror = () => rej(req.error);
+        });
+
+        await clearStore('projects');
+        await clearStore('employees');
+        await clearStore('entries');
+
+        // Nahrát data
+        const putAll = (storeName, items) => new Promise((res, rej) => {
+          const tx = db.transaction(storeName, 'readwrite');
+          const store = tx.objectStore(storeName);
+          let done = 0;
+          if (items.length === 0) { res(0); return; }
+          items.forEach(item => {
+            const req = store.put(item);
+            req.onsuccess = () => { done++; if (done === items.length) res(done); };
+            req.onerror = () => rej(req.error);
+          });
+        });
+
+        const pCount = await putAll('projects', backup.data.projects);
+        const eCount = await putAll('employees', backup.data.employees);
+        const nCount = await putAll('entries', backup.data.entries);
+
+        resolve({
+          projects: pCount,
+          employees: eCount,
+          entries: nCount,
+          backupDate: backup.created || 'neznámé'
+        });
+      } catch (err) {
+        reject('Chyba parsování: ' + err.message);
+      }
+    };
+    reader.onerror = () => reject('Chyba čtení souboru');
+    reader.readAsText(file);
+  });
+}
+
