@@ -98,6 +98,8 @@ function openPage(pageId) {
   if (pageId === 'pageEmployees' && currentProject) loadEmployees();
   if (pageId === 'pageSettings') { loadProjectList(); populateExportSelects(); }
   if (pageId === 'pageSearch') initSearchPage();
+  if (pageId === 'pageVykaz') loadVykaz();
+  if (pageId === 'pageDocházka') loadDochazka();
   // Show/hide back button
   const backBtn = document.getElementById('backBtn');
   const mainPages = ['pageDashboard'];
@@ -626,7 +628,6 @@ async function loadStats() {
   document.getElementById('statDays').textContent=stats.workDaysCount;
   document.getElementById('statAvg').textContent=stats.avgHoursPerDay;
   await loadEmployeeStats(month);
-  await loadAttendanceTable(month);
   await populateExportSelects();
   await renderCharts(currentProject,month);
 }
@@ -666,13 +667,160 @@ async function populateExportSelects() {
   });
 }
 
-// ---- ATTENDANCE TABLE ----
-async function loadAttendanceTable(month) {
-  const c=document.getElementById('attendanceContainer');
-  if (!month) {
-    // Bez měsíce defaultnout na aktuální
-    month = currentMonthStr();
+// ---- DOCHÁZKA ----
+function openDocházka() {
+  const m = document.getElementById('statsMonth').value || currentMonthStr();
+  document.getElementById('dochMonth').value = m;
+  openPage('pageDocházka');
+  loadDochazka();
+}
+
+async function loadDochazka() {
+  if (!currentProject) return;
+  let month = document.getElementById('dochMonth').value || currentMonthStr();
+  document.getElementById('dochMonth').value = month;
+
+  const emps = await getEmployees(currentProject);
+  const empMap = {};
+  emps.forEach(e => empMap[e.id] = e.name);
+
+  const y = parseInt(month.split('-')[0]), m = parseInt(month.split('-')[1]);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const from = month + '-01', to = month + '-' + String(daysInMonth).padStart(2, '0');
+  const entries = await getEntries(currentProject, from, to);
+
+  const c = document.getElementById('dochContent');
+  const statsEl = document.getElementById('dochStats');
+
+  if (!entries.length) {
+    c.innerHTML = '<div class="empty-state"><h3>Žádná docházka</h3><p>V tomto měsíci nejsou záznamy</p></div>';
+    statsEl.innerHTML = '';
+    loadAttendanceTable(month);
+    return;
   }
+
+  // Build per-day data
+  const dayData = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = month + '-' + String(d).padStart(2, '0');
+    dayData[ds] = {};
+  }
+  entries.forEach(e => {
+    if (!dayData[e.date]) dayData[e.date] = {};
+    const name = empMap[e.employeeId] || 'Neznámý';
+    dayData[e.date][name] = (dayData[e.date][name] || 0) + e.hours;
+  });
+
+  // Per-employee stats
+  const empStats = {};
+  emps.forEach(e => { empStats[e.name] = { days: 0, hours: 0 }; });
+  entries.forEach(e => {
+    const name = empMap[e.employeeId] || 'Neznámý';
+    if (!empStats[name]) empStats[name] = { days: 0, hours: 0 };
+  });
+
+  // Count unique days per employee
+  const empDaySet = {};
+  entries.forEach(e => {
+    const name = empMap[e.employeeId] || 'Neznámý';
+    if (!empDaySet[name]) empDaySet[name] = new Set();
+    empDaySet[name].add(e.date);
+    if (!empStats[name]) empStats[name] = { days: 0, hours: 0 };
+    empStats[name].hours += e.hours;
+  });
+  Object.entries(empDaySet).forEach(([name, set]) => {
+    if (empStats[name]) empStats[name].days = set.size;
+  });
+
+  // All employee names for absent detection
+  const allNames = emps.map(e => e.name);
+
+  // Totals
+  const totalDaysWithWork = Object.values(dayData).filter(d => Object.keys(d).length > 0).length;
+  const totalEntryHours = entries.reduce((s, e) => s + e.hours, 0);
+  const avgPeoplePerDay = totalDaysWithWork > 0
+    ? (Object.values(dayData).reduce((s, d) => s + Object.keys(d).length, 0) / totalDaysWithWork).toFixed(1)
+    : 0;
+
+  // Summary stats
+  statsEl.innerHTML = `
+    <div class="glass stat-card"><div class="stat-value green">${totalDaysWithWork}</div><div class="stat-label">Prac. dnů</div></div>
+    <div class="glass stat-card"><div class="stat-value blue">${avgPeoplePerDay}</div><div class="stat-label">Ø lidí / den</div></div>
+    <div class="glass stat-card"><div class="stat-value amber">${allNames.length}</div><div class="stat-label">Zaměstnanců</div></div>
+    <div class="glass stat-card"><div class="stat-value blue">${totalEntryHours.toFixed(0)}</div><div class="stat-label">Celkem hodin</div></div>
+  `;
+
+  let html = '';
+
+  // === PER-EMPLOYEE SUMMARY ===
+  html += '<div class="section-header"><h3 class="section-title">Souhrn osob</h3></div>';
+  const sortedEmpStats = Object.entries(empStats)
+    .filter(([, d]) => d.days > 0)
+    .sort((a, b) => b[1].days - a[1].days);
+
+  sortedEmpStats.forEach(([name, d]) => {
+    const ec = empColor(name);
+    const pct = totalDaysWithWork > 0 ? Math.round((d.days / totalDaysWithWork) * 100) : 0;
+    html += `<div class="doch-summary-row">
+      <div class="doch-summary-name">${avatarHtml(name, 26)} ${escHtml(name)}
+        <span class="doch-streak ${pct >= 80 ? 'present' : pct < 50 ? 'absent' : ''}">${pct}%</span>
+      </div>
+      <div class="doch-summary-stats">
+        <span><span class="ds-val">${d.days}</span>d</span>
+        <span><span class="ds-val">${d.hours.toFixed(0)}</span>h</span>
+      </div>
+    </div>`;
+  });
+
+  // === PER-DAY CARDS ===
+  html += '<div class="section-header mt-16"><h3 class="section-title">Denní docházka</h3></div>';
+
+  const wdNames = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
+  const dates = Object.keys(dayData).sort().reverse();
+
+  dates.forEach(date => {
+    const people = dayData[date];
+    const names = Object.keys(people);
+    if (!names.length) return; // Skip days with no work
+
+    const wd = new Date(date).getDay();
+    const tH = Object.values(people).reduce((s, h) => s + h, 0);
+    const absent = allNames.filter(n => !names.includes(n));
+
+    html += `<div class="doch-day">
+      <div class="doch-day-header">
+        <div class="doch-day-date">${formatDate(date)} <span class="wd">${wdNames[wd]}</span></div>
+        <div class="doch-day-count"><span>${names.length} lidí</span><span>${tH.toFixed(0)}h</span></div>
+      </div>
+      <div class="doch-people">`;
+
+    names.sort((a, b) => a.localeCompare(b, 'cs')).forEach(name => {
+      const ec = empColor(name);
+      html += `<div class="doch-chip" style="border-color:${ec.border}"><span class="emp-dot" style="background:${ec.bar}"></span>${escHtml(name.split(' ')[0])} <span class="dch-hours">${people[name]}h</span></div>`;
+    });
+
+    html += '</div>';
+
+    if (absent.length) {
+      html += '<div class="doch-absent">';
+      absent.forEach(name => {
+        html += `<div class="doch-absent-chip">${escHtml(name.split(' ')[0])}</div>`;
+      });
+      html += '</div>';
+    }
+
+    html += '</div>';
+  });
+
+  c.innerHTML = html;
+
+  // Load the grid table too
+  loadAttendanceTable(month);
+}
+
+async function loadAttendanceTable(month) {
+  const c = document.getElementById('attendanceContainer');
+  if (!month) month = currentMonthStr();
 
   const emps=await getEmployees(currentProject);
   const y=parseInt(month.split('-')[0]), m=parseInt(month.split('-')[1]);
@@ -813,4 +961,132 @@ async function doRestore(input) {
 
   // Reset inputu aby šlo znovu vybrat stejný soubor
   input.value = '';
+}
+
+// ---- VÝKAZ ----
+function openVykaz() {
+  const m = document.getElementById('statsMonth').value || '';
+  document.getElementById('vykazMonth').value = m;
+  openPage('pageVykaz');
+  loadVykaz();
+}
+
+async function loadVykaz() {
+  const c = document.getElementById('vykazContent');
+  const expEl = document.getElementById('vykazExport');
+  if (!currentProject) { c.innerHTML='<div class="empty-state"><h3>Vyber projekt</h3></div>'; expEl.style.display='none'; return; }
+
+  const month = document.getElementById('vykazMonth').value || null;
+  const projects = await getProjects();
+  const proj = projects.find(p => p.id === currentProject);
+  const emps = await getEmployees(currentProject);
+  const empMap = {};
+  emps.forEach(e => empMap[e.id] = e.name);
+
+  let entries;
+  if (month) {
+    const y=parseInt(month.split('-')[0]),m=parseInt(month.split('-')[1]);
+    const last=new Date(y,m,0).getDate();
+    entries=await getEntries(currentProject,month+'-01',month+'-'+String(last).padStart(2,'0'));
+  } else {
+    entries=await getAllEntries(currentProject);
+  }
+
+  if (!entries.length) { c.innerHTML='<div class="empty-state"><h3>Žádná data</h3></div>'; expEl.style.display='none'; return; }
+
+  // Sort: date asc, then name asc
+  entries.sort((a,b) => {
+    if (a.date<b.date) return -1; if (a.date>b.date) return 1;
+    return (empMap[a.employeeId]||'').localeCompare(empMap[b.employeeId]||'','cs');
+  });
+
+  const dateFrom=entries[0].date, dateTo=entries[entries.length-1].date;
+  const periodStr=month
+    ? new Date(parseInt(month.split('-')[0]),parseInt(month.split('-')[1])-1).toLocaleDateString('cs',{month:'long',year:'numeric'})
+    : `${formatDate(dateFrom)} – ${formatDate(dateTo)}`;
+
+  let html='';
+  html+=`<div class="vykaz-project-name">${escHtml(proj?proj.name:'')}</div>`;
+  html+=`<div class="vykaz-period">${periodStr}</div>`;
+  html+=`<div class="vykaz-note"><strong>Mzda</strong> = Hodinovka + Stringy<br><strong>Orientační hodiny</strong> = pouze informativní údaj (hodiny při úkolu, neproplácené)</div>`;
+
+  // === HLAVNÍ TABULKA ===
+  html+=`<div class="vykaz-section-title">Hlavní tabulka</div><div class="vykaz-scroll"><table class="vykaz-table"><thead><tr>`;
+  html+=`<th>Datum</th><th>Jméno</th><th>Typ práce</th><th>Hodinovka</th><th>Stringy</th><th>Orient. h</th><th>H. na stavbě</th></tr></thead><tbody>`;
+
+  let totH=0,totS=0,totO=0,totSt=0,lastDate='';
+  const zc=v=>v===0?`<td class="num zero">0</td>`:`<td class="num">${v}</td>`;
+
+  entries.forEach(e=>{
+    const name=empMap[e.employeeId]||'Neznámý';
+    const isH=e.workType==='hourly';
+    const hod=isH?e.hours:0, str=!isH?e.strings:0, ori=!isH?e.hours:0, stav=e.hours;
+    totH+=hod; totS+=str; totO+=ori; totSt+=stav;
+    const db=e.date!==lastDate?' class="day-break"':'';
+    lastDate=e.date;
+    const ec=empColor(name);
+    html+=`<tr${db}><td>${formatDate(e.date)}</td><td><span class="emp-dot" style="background:${ec.bar}"></span>${escHtml(name)}</td><td>${isH?'Hodinovka':'Úkol/Stringy'}</td>${zc(hod)}${zc(str)}${zc(ori)}<td class="num">${stav}</td></tr>`;
+  });
+
+  html+=`</tbody><tfoot><tr><td colspan="3"><strong>CELKEM</strong></td><td class="num">${totH}</td><td class="num">${totS}</td><td class="num">${totO}</td><td class="num">${totSt}</td></tr></tfoot></table></div>`;
+
+  // === SOUHRN PODLE OSOB ===
+  html+=`<div class="vykaz-section-title">Souhrn podle osob</div>`;
+
+  const perEmp={};
+  entries.forEach(e=>{
+    const name=empMap[e.employeeId]||'Neznámý';
+    if(!perEmp[name]) perEmp[name]={hodinovka:0,stringy:0,orient:0,stavba:0};
+    const isH=e.workType==='hourly';
+    perEmp[name].hodinovka+=isH?e.hours:0;
+    perEmp[name].stringy+=!isH?e.strings:0;
+    perEmp[name].orient+=!isH?e.hours:0;
+    perEmp[name].stavba+=e.hours;
+  });
+
+  const sorted=Object.entries(perEmp).sort((a,b)=>b[1].stavba-a[1].stavba);
+
+  html+=`<div class="vykaz-scroll"><table class="vykaz-table"><thead><tr><th>Jméno</th><th>Hodinovka</th><th>Stringy</th><th>Orient. h</th><th>H. na stavbě</th></tr></thead><tbody>`;
+  sorted.forEach(([name,d])=>{
+    const ec=empColor(name);
+    html+=`<tr><td><span class="emp-dot" style="background:${ec.bar}"></span><strong>${escHtml(name)}</strong></td>${zc(d.hodinovka)}${zc(d.stringy)}${zc(d.orient)}<td class="num"><strong>${d.stavba}</strong></td></tr>`;
+  });
+  html+=`</tbody><tfoot><tr><td><strong>CELKEM</strong></td><td class="num">${totH}</td><td class="num">${totS}</td><td class="num">${totO}</td><td class="num">${totSt}</td></tr></tfoot></table></div>`;
+
+  c.innerHTML=html;
+  expEl.style.display='block';
+}
+
+async function exportVykaz() {
+  if (!currentProject) return;
+  const month=document.getElementById('vykazMonth').value||null;
+  const projects=await getProjects(),proj=projects.find(p=>p.id===currentProject);
+  const emps=await getEmployees(currentProject),empMap={};
+  emps.forEach(e=>empMap[e.id]=e.name);
+
+  let entries;
+  if(month){const y=parseInt(month.split('-')[0]),m=parseInt(month.split('-')[1]),last=new Date(y,m,0).getDate();entries=await getEntries(currentProject,month+'-01',month+'-'+String(last).padStart(2,'0'))}
+  else{entries=await getAllEntries(currentProject)}
+
+  entries.sort((a,b)=>{if(a.date<b.date)return -1;if(a.date>b.date)return 1;return(empMap[a.employeeId]||'').localeCompare(empMap[b.employeeId]||'','cs')});
+
+  let csv=`Projekt: ${proj?proj.name:''}\n\nDatum;Jméno;Typ práce;Hodinovka;Stringy;Orientační hodiny (úkol);Hodiny na stavbě\n`;
+  let tH=0,tS=0,tO=0,tSt=0;
+  entries.forEach(e=>{
+    const name=empMap[e.employeeId]||'',isH=e.workType==='hourly';
+    const hod=isH?e.hours:0,str=!isH?e.strings:0,ori=!isH?e.hours:0;
+    tH+=hod;tS+=str;tO+=ori;tSt+=e.hours;
+    csv+=`${e.date};${name};${isH?'Hodinovka':'Úkol/Stringy'};${hod};${str};${ori};${e.hours}\n`;
+  });
+  csv+=`\nCELKEM;;;${tH};${tS};${tO};${tSt}\n`;
+
+  csv+='\n\nSOUHRN PODLE OSOB\nJméno;Hodinovka celkem;Stringy celkem;Orientační hodiny (úkol);Hodiny na stavbě celkem\n';
+  const pe={};
+  entries.forEach(e=>{const n=empMap[e.employeeId]||'';if(!pe[n])pe[n]={h:0,s:0,o:0,st:0};const isH=e.workType==='hourly';pe[n].h+=isH?e.hours:0;pe[n].s+=!isH?e.strings:0;pe[n].o+=!isH?e.hours:0;pe[n].st+=e.hours});
+  Object.entries(pe).sort((a,b)=>b[1].st-a[1].st).forEach(([n,d])=>{csv+=`${n};${d.h};${d.s};${d.o};${d.st}\n`});
+  csv+=`CELKEM;${tH};${tS};${tO};${tSt}\n`;
+
+  const sfx=month?`_${month}`:'';
+  downloadCSV(csv,`SolarTrack_vykaz_${proj?proj.name:'export'}${sfx}.csv`);
+  showToast('Výkaz CSV exportován ✓');
 }

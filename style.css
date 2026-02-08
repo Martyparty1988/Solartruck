@@ -314,4 +314,39 @@ label{display:block;font-size:10px;font-weight:700;color:var(--text-3);margin-bo
 .text-center{text-align:center}.text-muted{color:var(--text-3)}.text-sm{font-size:13px}
 .flex{display:flex}.gap-8{gap:8px}
 
+/* ---- DOCHÁZKA ---- */
+.doch-day{margin-bottom:12px}
+.doch-day-header{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:6px}
+.doch-day-date{font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px}
+.doch-day-date .wd{color:var(--text-3);font-weight:500;font-size:11px}
+.doch-day-count{font-size:11px;color:var(--text-2);font-family:'JetBrains Mono',monospace;font-weight:600;display:flex;gap:10px}
+.doch-people{display:flex;flex-wrap:wrap;gap:5px}
+.doch-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:var(--r-full);background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:600}
+.doch-chip .dch-hours{font-family:'JetBrains Mono',monospace;color:var(--text-2);font-size:10px}
+.doch-absent{margin-top:4px;display:flex;flex-wrap:wrap;gap:5px}
+.doch-absent-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:var(--r-full);background:var(--red-soft);border:1px solid rgba(239,68,68,0.1);font-size:10px;color:var(--red);font-weight:600;opacity:.7}
+.doch-summary-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:6px}
+.doch-summary-name{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}
+.doch-summary-stats{display:flex;gap:8px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text-2)}
+.doch-summary-stats .ds-val{color:var(--text)}
+.doch-streak{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:var(--r-full);font-size:9px;font-weight:700}
+.doch-streak.present{background:var(--green-soft);color:var(--green)}
+.doch-streak.absent{background:var(--red-soft);color:var(--red)}
+
+/* ---- VÝKAZ TABLE ---- */
+.vykaz-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:20px}
+.vykaz-table{border-collapse:collapse;font-size:12px;font-family:'JetBrains Mono','Inter',monospace;min-width:100%;white-space:nowrap}
+.vykaz-table th,.vykaz-table td{padding:8px 10px;border:1px solid var(--border-2);text-align:left}
+.vykaz-table thead th{position:sticky;top:0;background:rgba(6,8,15,0.95);color:var(--accent);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;z-index:2}
+.vykaz-table tbody td{color:var(--text)}
+.vykaz-table tbody td.num{text-align:right;font-weight:600}
+.vykaz-table tbody td.zero{color:var(--text-3);opacity:.35}
+.vykaz-table tbody tr.day-break td{border-top:2px solid var(--border-2)}
+.vykaz-table tfoot td,.vykaz-table tfoot th{font-weight:800;color:var(--accent);background:rgba(245,158,11,0.05);border-top:2px solid rgba(245,158,11,0.2)}
+.vykaz-project-name{font-size:16px;font-weight:800;margin-bottom:4px}
+.vykaz-period{font-size:11px;color:var(--text-3);margin-bottom:14px;font-weight:600}
+.vykaz-note{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:16px;font-size:12px;color:var(--text-2);line-height:1.6}
+.vykaz-note strong{color:var(--accent)}
+.vykaz-section-title{font-size:13px;font-weight:800;color:var(--text);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
 @media(min-width:500px){.page{max-width:500px;margin:0 auto}.modal-content{border-radius:var(--r-xl);margin-bottom:20px}}
