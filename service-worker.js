@@ -3,7 +3,7 @@
 // Offline-first – GitHub Pages kompatibilní
 // ============================================
 
-const CACHE_NAME = 'solar-tracker-v18';
+const CACHE_NAME = 'solar-tracker-v19';
 
 // Zjistíme base path z SW scope (funguje na root i GitHub Pages)
 const BASE = self.registration.scope;
