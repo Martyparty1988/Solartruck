@@ -35,6 +35,32 @@ function currentMonthStr() { const d = new Date(); return d.getFullYear()+'-'+St
 function formatDate(s) { const [y,m,d]=s.split('-'); return `${d}.${m}.${y}`; }
 function getWeekday(s) { return ['Ne','Po','Út','St','Čt','Pá','So'][new Date(s).getDay()]; }
 function getInitials(n) { return n.split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2); }
+
+const EMP_COLORS = [
+  {bg:'rgba(59,130,246,0.15)',border:'rgba(59,130,246,0.2)',text:'#60a5fa',bar:'#3b82f6'},   // blue
+  {bg:'rgba(245,158,11,0.15)',border:'rgba(245,158,11,0.2)',text:'#fbbf24',bar:'#f59e0b'},    // amber
+  {bg:'rgba(16,185,129,0.15)',border:'rgba(16,185,129,0.2)',text:'#34d399',bar:'#10b981'},     // green
+  {bg:'rgba(239,68,68,0.15)',border:'rgba(239,68,68,0.2)',text:'#f87171',bar:'#ef4444'},       // red
+  {bg:'rgba(168,85,247,0.15)',border:'rgba(168,85,247,0.2)',text:'#c084fc',bar:'#a855f7'},     // purple
+  {bg:'rgba(236,72,153,0.15)',border:'rgba(236,72,153,0.2)',text:'#f472b6',bar:'#ec4899'},     // pink
+  {bg:'rgba(6,182,212,0.15)',border:'rgba(6,182,212,0.2)',text:'#22d3ee',bar:'#06b6d4'},       // cyan
+  {bg:'rgba(249,115,22,0.15)',border:'rgba(249,115,22,0.2)',text:'#fb923c',bar:'#f97316'},     // orange
+  {bg:'rgba(132,204,22,0.15)',border:'rgba(132,204,22,0.2)',text:'#a3e635',bar:'#84cc16'},     // lime
+  {bg:'rgba(99,102,241,0.15)',border:'rgba(99,102,241,0.2)',text:'#818cf8',bar:'#6366f1'},     // indigo
+];
+
+function empColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  return EMP_COLORS[Math.abs(hash) % EMP_COLORS.length];
+}
+
+function avatarHtml(name, size) {
+  const s = size || 32;
+  const c = empColor(name);
+  const fs = Math.round(s * 0.34);
+  return `<div class="employee-avatar" style="width:${s}px;height:${s}px;font-size:${fs}px;background:${c.bg};border-color:${c.border};color:${c.text}">${getInitials(name)}</div>`;
+}
 function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 function showToast(msg, err=false) {
@@ -138,7 +164,7 @@ async function loadEmployees() {
   const emps = await getEmployees(currentProject);
   const c = document.getElementById('employeeList');
   if (!emps.length) { c.innerHTML = '<div class="empty-state"><h3>Žádní zaměstnanci</h3><p>Přidejte prvního</p></div>'; return; }
-  c.innerHTML = emps.map(e => `<div class="employee-item"><div class="employee-name"><div class="employee-avatar">${getInitials(e.name)}</div>${escHtml(e.name)}</div><button class="btn btn-sm btn-danger btn-icon" onclick="deleteEmployeeConfirm('${e.id}','${escHtml(e.name)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('');
+  c.innerHTML = emps.map(e => `<div class="employee-item"><div class="employee-name">${avatarHtml(e.name,32)}${escHtml(e.name)}</div><button class="btn btn-sm btn-danger btn-icon" onclick="deleteEmployeeConfirm('${e.id}','${escHtml(e.name)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('');
 }
 
 async function addNewEmployee() {
@@ -234,11 +260,13 @@ function renderEntryGroups(entries, empMap, highlightText) {
     html+=`<div class="day-group"><div class="day-header"><div class="day-date">${formatDate(date)}<span class="weekday">${getWeekday(date)}</span></div><div class="day-summary"><span>${tH}h</span>${tS>0?`<span>${tS}s</span>`:''}</div></div>`;
     de.forEach(entry=>{
       const isH=entry.workType==='hourly';
-      let name=escHtml(empMap[entry.employeeId]||'Neznámý');
+      const empName=empMap[entry.employeeId]||'Neznámý';
+      let name=escHtml(empName);
       let tables=entry.tables?escHtml(entry.tables):'';
       let note=entry.note?escHtml(entry.note):'';
       if (highlightText) { name=hlText(name,highlightText); tables=hlText(tables,highlightText); if(note)note=hlText(note,highlightText); }
-      html+=`<div class="card entry-card ${isH?'hourly':'task'}"><div class="entry-header"><span class="entry-name">${name}</span><span class="badge ${isH?'badge-hourly':'badge-task'}">${isH?'⏱ Hod.':'✓ Úkol'}</span></div><div class="entry-meta"><div class="entry-meta-item"><strong>${entry.hours}h</strong></div>${entry.strings>0?`<div class="entry-meta-item"><strong>${entry.strings}s</strong></div>`:''}</div>${entry.tables?`<div class="entry-tables">🔧 ${tables}</div>`:''}${entry.note?`<div class="entry-note">💬 ${note}</div>`:''}
+      const ec=empColor(empName);
+      html+=`<div class="card entry-card ${isH?'hourly':'task'}" style="border-left:3px solid ${ec.bar}"><div class="entry-header"><span class="entry-name"><span class="emp-dot" style="background:${ec.bar}"></span>${name}</span><span class="badge ${isH?'badge-hourly':'badge-task'}">${isH?'Hod.':'Úkol'}</span></div><div class="entry-meta"><div class="entry-meta-item"><strong>${entry.hours}h</strong></div>${entry.strings>0?`<div class="entry-meta-item"><strong>${entry.strings}s</strong></div>`:''}</div>${entry.tables?`<div class="entry-tables">${tables}</div>`:''}${entry.note?`<div class="entry-note">${note}</div>`:''}
 <div class="entry-actions"><button class="btn btn-sm btn-ghost" onclick="editEntry('${entry.id}')">Upravit</button><button class="btn btn-sm btn-danger" onclick="deleteEntryConfirm('${entry.id}')">Smazat</button></div></div>`;
     });
     html+='</div>';
@@ -268,7 +296,44 @@ async function openNewEntry() {
   document.getElementById('entryTables').value='';
   document.getElementById('entryNote').value='';
   setWorkType('hourly');
+  await loadTableSuggestions();
   document.getElementById('modalEntry').classList.add('show');
+}
+
+async function loadTableSuggestions() {
+  const c = document.getElementById('tableSuggestions');
+  if (!currentProject) { c.innerHTML = ''; return; }
+
+  const entries = await getAllEntries(currentProject);
+  // Extract unique table numbers from recent entries, newest first
+  const tableSet = new Set();
+  const tables = [];
+  entries.forEach(e => {
+    if (!e.tables) return;
+    // Split by common separators
+    e.tables.split(/[,\s]+/).forEach(t => {
+      t = t.trim();
+      if (t && !tableSet.has(t)) { tableSet.add(t); tables.push(t); }
+    });
+  });
+
+  // Show last 12 unique tables
+  const recent = tables.slice(0, 12);
+  if (!recent.length) { c.innerHTML = ''; return; }
+
+  c.innerHTML = recent.map(t =>
+    `<button class="table-chip" onclick="addTableToEntry('${escHtml(t)}')">${escHtml(t)}</button>`
+  ).join('');
+}
+
+function addTableToEntry(table) {
+  const inp = document.getElementById('entryTables');
+  const cur = inp.value.trim();
+  if (cur && !cur.endsWith(',') && !cur.endsWith(' ')) {
+    inp.value = cur + ' ' + table;
+  } else {
+    inp.value = (cur ? cur + ' ' : '') + table;
+  }
 }
 
 async function editEntry(id) {
@@ -286,6 +351,7 @@ async function editEntry(id) {
   document.getElementById('entryTables').value=entry.tables||'';
   document.getElementById('entryNote').value=entry.note||'';
   setWorkType(entry.workType);
+  await loadTableSuggestions();
   document.getElementById('modalEntry').classList.add('show');
 }
 
@@ -312,7 +378,37 @@ async function saveEntry() {
   } catch(e) { showToast('Chyba!',true); }
 }
 
-function deleteEntryConfirm(id) { showConfirm('Smazat?','Smazat záznam?',async()=>{await deleteEntry(id);loadDashboard();showToast('Smazáno')}); }
+let undoEntry = null;
+let undoTimeout = null;
+
+function deleteEntryConfirm(id) {
+  showConfirm('Smazat?','Smazat záznam?', async () => {
+    // Save for undo
+    const entries = await getAllEntries(currentProject);
+    undoEntry = entries.find(e => e.id === id);
+    await deleteEntry(id);
+    loadDashboard();
+    showUndoToast('Smazáno');
+  });
+}
+
+function showUndoToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg + ' <button class="undo-btn" onclick="undoDelete()">Vrátit ↩</button>';
+  t.className = 'toast show';
+  clearTimeout(undoTimeout);
+  undoTimeout = setTimeout(() => { t.className = 'toast'; undoEntry = null; }, 5000);
+}
+
+async function undoDelete() {
+  if (!undoEntry) return;
+  await addEntry(undoEntry);
+  undoEntry = null;
+  clearTimeout(undoTimeout);
+  document.getElementById('toast').className = 'toast';
+  showToast('Obnoveno ✓');
+  loadDashboard();
+}
 function closeModal() { document.getElementById('modalEntry').classList.remove('show'); editingEntryId=null; }
 function closeModalOnBg(e) { if(e.target===e.currentTarget)closeModal(); }
 
@@ -324,7 +420,7 @@ async function openBatchEntry() {
   document.getElementById('batchDate').value=todayStr();
   batchWorkType='hourly'; setBatchWorkType('hourly');
   const c=document.getElementById('batchEmployeeList');
-  c.innerHTML=emps.map(emp=>`<div class="batch-row" id="brow_${emp.id}" data-empid="${emp.id}"><div class="batch-row-header"><div class="batch-row-name"><div class="employee-avatar" style="width:24px;height:24px;font-size:10px">${getInitials(emp.name)}</div>${escHtml(emp.name)}</div><div class="batch-row-type"><button class="batch-type-btn sel-hourly" data-emp="${emp.id}" data-type="hourly" onclick="toggleBatchRowType('${emp.id}','hourly')">⏱</button><button class="batch-type-btn" data-emp="${emp.id}" data-type="task" onclick="toggleBatchRowType('${emp.id}','task')">✓</button></div></div><div class="batch-row-inputs"><div><div class="batch-input-label">Hodiny</div><input type="number" id="bh_${emp.id}" placeholder="0" step="0.5" min="0" max="24" inputmode="decimal" oninput="updateBatchSummary()"></div><div class="batch-strings-col" id="bsc_${emp.id}" style="opacity:0.4"><div class="batch-input-label">Stringy</div><input type="number" id="bs_${emp.id}" placeholder="0" min="0" inputmode="numeric" oninput="updateBatchSummary()"></div><div><div class="batch-input-label">Stoly</div><input type="text" id="bt_${emp.id}" placeholder="3E42..."></div></div></div>`).join('');
+  c.innerHTML=emps.map(emp=>`<div class="batch-row" id="brow_${emp.id}" data-empid="${emp.id}"><div class="batch-row-header"><div class="batch-row-name">${avatarHtml(emp.name,24)}${escHtml(emp.name)}</div><div class="batch-row-type"><button class="batch-type-btn sel-hourly" data-emp="${emp.id}" data-type="hourly" onclick="toggleBatchRowType('${emp.id}','hourly')">H</button><button class="batch-type-btn" data-emp="${emp.id}" data-type="task" onclick="toggleBatchRowType('${emp.id}','task')">Ú</button></div></div><div class="batch-row-inputs"><div><div class="batch-input-label">Hodiny</div><input type="number" id="bh_${emp.id}" placeholder="0" step="0.5" min="0" max="24" inputmode="decimal" oninput="updateBatchSummary()"></div><div class="batch-strings-col" id="bsc_${emp.id}" style="opacity:0.4"><div class="batch-input-label">Stringy</div><input type="number" id="bs_${emp.id}" placeholder="0" min="0" inputmode="numeric" oninput="updateBatchSummary()"></div><div><div class="batch-input-label">Stoly</div><input type="text" id="bt_${emp.id}" placeholder="3E42..."></div></div></div>`).join('');
   updateBatchSummary();
   document.getElementById('modalBatch').classList.add('show');
 }
@@ -346,6 +442,35 @@ function toggleBatchRowType(empId,t) {
 
 function batchFillAllHours(h) { document.querySelectorAll('.batch-row').forEach(r=>{document.getElementById('bh_'+r.dataset.empid).value=h}); updateBatchSummary(); }
 function batchClearAll() { document.querySelectorAll('.batch-row').forEach(r=>{const id=r.dataset.empid;document.getElementById('bh_'+id).value='';document.getElementById('bs_'+id).value='';document.getElementById('bt_'+id).value=''}); updateBatchSummary(); }
+
+async function batchCopyPrevDay() {
+  if (!currentProject) return;
+  const batchDate = document.getElementById('batchDate').value;
+  if (!batchDate) { showToast('Nastav datum!', true); return; }
+
+  // Find previous day with data
+  const allEntries = await getAllEntries(currentProject);
+  const dates = [...new Set(allEntries.map(e => e.date))].sort().reverse();
+  const prevDate = dates.find(d => d < batchDate);
+
+  if (!prevDate) { showToast('Žádný předchozí den!', true); return; }
+
+  const prevEntries = allEntries.filter(e => e.date === prevDate);
+  let filled = 0;
+
+  prevEntries.forEach(pe => {
+    const row = document.getElementById('brow_' + pe.employeeId);
+    if (!row) return;
+    document.getElementById('bh_' + pe.employeeId).value = pe.hours;
+    if (pe.strings > 0) document.getElementById('bs_' + pe.employeeId).value = pe.strings;
+    if (pe.tables) document.getElementById('bt_' + pe.employeeId).value = pe.tables;
+    toggleBatchRowType(pe.employeeId, pe.workType);
+    filled++;
+  });
+
+  updateBatchSummary();
+  showToast(`📋 Zkopírováno z ${formatDate(prevDate)} (${filled} lidí)`);
+}
 
 function updateBatchSummary() {
   let cnt=0,tH=0,tS=0;
@@ -516,8 +641,18 @@ async function loadEmployeeStats(month) {
   entries.forEach(e=>{if(!ed[e.employeeId])return;ed[e.employeeId].hours+=e.hours;ed[e.employeeId].strings+=e.strings;ed[e.employeeId].days.add(e.date)});
   const sorted=Object.entries(ed).filter(([,d])=>d.hours>0).sort((a,b)=>b[1].hours-a[1].hours);
   if (!sorted.length) { c.innerHTML='<p class="text-sm text-muted text-center" style="padding:14px">Žádná data</p>'; return; }
+
+  // Top performers
+  const topHours = sorted[0][1].hours;
+  const topStrings = Math.max(...sorted.map(([,d]) => d.strings));
+
   let html='<div class="emp-stats-list">';
-  sorted.forEach(([,d])=>{const avg=d.days.size>0?(d.hours/d.days.size).toFixed(1):0;html+=`<div class="emp-stat-card"><div class="emp-stat-info"><div class="emp-stat-name"><div class="employee-avatar" style="width:26px;height:26px;font-size:10px">${getInitials(d.name)}</div>${escHtml(d.name)}</div><div class="emp-stat-row"><div class="emp-stat-item">⏱ <strong>${d.hours.toFixed(1)}</strong>h</div>${d.strings>0?`<div class="emp-stat-item">✓ <strong>${d.strings}</strong>s</div>`:''}<div class="emp-stat-item">📅 <strong>${d.days.size}</strong>d</div><div class="emp-stat-item">Ø <strong>${avg}</strong>h/d</div></div></div><div class="emp-stat-bar"><div class="emp-stat-bar-value">${d.hours.toFixed(0)}</div><div class="emp-stat-bar-label">hodin</div></div></div>`});
+  sorted.forEach(([,d])=>{
+    const avg=d.days.size>0?(d.hours/d.days.size).toFixed(1):0;
+    const isTopH = d.hours === topHours;
+    const isTopS = topStrings > 0 && d.strings === topStrings;
+    const topClass = (isTopH || isTopS) ? ' top-performer' : '';
+    html+=`<div class="emp-stat-card${topClass}"><div class="emp-stat-info"><div class="emp-stat-name">${avatarHtml(d.name,26)}${escHtml(d.name)}${isTopH?'<span class="top-badge">Top h</span>':''}${isTopS && !isTopH?'<span class="top-badge">Top s</span>':''}</div><div class="emp-stat-row"><div class="emp-stat-item"><strong>${d.hours.toFixed(1)}</strong>h</div>${d.strings>0?`<div class="emp-stat-item"><strong>${d.strings}</strong>s</div>`:''}<div class="emp-stat-item"><strong>${d.days.size}</strong>d</div><div class="emp-stat-item">Ø <strong>${avg}</strong>h/d</div></div></div><div class="emp-stat-bar" style="color:${empColor(d.name).bar}"><div class="emp-stat-bar-value">${d.hours.toFixed(0)}</div><div class="emp-stat-bar-label">hodin</div></div></div>`});
   html+='</div>'; c.innerHTML=html;
 }
 
@@ -583,7 +718,8 @@ async function loadAttendanceTable(month) {
 
   active.forEach(([,emp])=>{
     const firstName=emp.name.split(' ')[0];
-    html+=`<tr><th>${escHtml(firstName)}</th>`;
+    const ec=empColor(emp.name);
+    html+=`<tr><th><span class="emp-dot" style="background:${ec.bar}"></span>${escHtml(firstName)}</th>`;
     for (let d=1;d<=daysInMonth;d++) {
       const h=emp.days[d]||0;
       const wd=new Date(y,m-1,d).getDay();
