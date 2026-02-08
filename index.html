@@ -142,7 +142,7 @@
   <div class="modal-overlay" id="modalEntry" onclick="closeModalOnBg(event)">
     <div class="modal-content glass" onclick="event.stopPropagation()">
       <div class="modal-handle"></div>
-      <div class="modal-title" id="modalEntryTitle">Nový záznam</div>
+      <div class="modal-header"><div class="modal-title" id="modalEntryTitle">Nový záznam</div><button class="btn-round glass-btn" onclick="closeModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="form-group"><label>Zaměstnanec</label><select id="entryEmployee"><option value="">Vyber...</option></select></div>
       <div class="form-group"><label>Datum</label><input type="date" id="entryDate"></div>
       <div class="form-group"><label>Typ práce</label><div class="work-type-toggle"><button class="work-type-btn active-hourly" id="btnHourly" onclick="setWorkType('hourly')">Hodinovka</button><button class="work-type-btn" id="btnTask" onclick="setWorkType('task')">Úkol</button></div></div>
@@ -156,7 +156,7 @@
   <div class="modal-overlay" id="modalBatch" onclick="closeBatchOnBg(event)">
     <div class="modal-content glass modal-batch" onclick="event.stopPropagation()">
       <div class="modal-handle"></div>
-      <div class="modal-title">Hromadné zadání</div>
+      <div class="modal-header"><div class="modal-title">Hromadné zadání</div><button class="btn-round glass-btn" onclick="closeBatchModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="batch-header-controls"><div class="form-group" style="flex:1"><label>Datum</label><input type="date" id="batchDate"></div><div class="form-group" style="flex:1"><label>Typ</label><div class="work-type-toggle"><button class="work-type-btn active-hourly" id="batchBtnHourly" onclick="setBatchWorkType('hourly')">H</button><button class="work-type-btn" id="batchBtnTask" onclick="setBatchWorkType('task')">Ú</button></div></div></div>
       <div class="batch-presets"><label>Všem:</label><div class="chip-row"><button class="chip" onclick="batchFillAllHours(8)">8h</button><button class="chip" onclick="batchFillAllHours(10)">10h</button><button class="chip" onclick="batchFillAllHours(12)">12h</button><button class="chip chip-accent" onclick="batchCopyPrevDay()">Včerejšek</button><button class="chip" onclick="batchClearAll()">✕</button></div></div>
       <div id="batchEmployeeList" class="batch-employee-list"></div>
