@@ -280,11 +280,20 @@ async function createBackup() {
   const employees = await getAllFromStore('employees');
   const entries = await getAllFromStore('entries');
 
+  // Collect day notes from localStorage
+  const dayNotes = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('dayNotes_')) {
+      try { dayNotes[key] = JSON.parse(localStorage.getItem(key)); } catch(e) {}
+    }
+  }
+
   const backup = {
     version: 2,
     app: 'SolarTrack',
     created: new Date().toISOString(),
-    data: { projects, employees, entries },
+    data: { projects, employees, entries, dayNotes },
     stats: {
       projects: projects.length,
       employees: employees.length,
@@ -351,6 +360,13 @@ async function restoreBackup(file) {
         const pCount = await putAll('projects', backup.data.projects);
         const eCount = await putAll('employees', backup.data.employees);
         const nCount = await putAll('entries', backup.data.entries);
+
+        // Restore day notes
+        if (backup.data.dayNotes) {
+          Object.entries(backup.data.dayNotes).forEach(([key, val]) => {
+            localStorage.setItem(key, JSON.stringify(val));
+          });
+        }
 
         resolve({
           projects: pCount,

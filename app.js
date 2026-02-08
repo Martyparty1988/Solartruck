@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('statsMonth').value = currentMonthStr();
   document.getElementById('newProjectName').addEventListener('keydown', e => { if (e.key === 'Enter') addNewProject(); });
   document.getElementById('newEmployeeName').addEventListener('keydown', e => { if (e.key === 'Enter') addNewEmployee(); });
+  setupNotificationReminder();
 });
 
 // ---- HELPERS ----
@@ -100,6 +101,7 @@ function openPage(pageId) {
   if (pageId === 'pageSearch') initSearchPage();
   if (pageId === 'pageVykaz') loadVykaz();
   if (pageId === 'pageDocházka') loadDochazka();
+  if (pageId === 'pageEmpProfile') renderEmpProfile();
   // Show/hide back button
   const backBtn = document.getElementById('backBtn');
   const mainPages = ['pageDashboard'];
@@ -166,7 +168,7 @@ async function loadEmployees() {
   const emps = await getEmployees(currentProject);
   const c = document.getElementById('employeeList');
   if (!emps.length) { c.innerHTML = '<div class="empty-state"><h3>Žádní zaměstnanci</h3><p>Přidejte prvního</p></div>'; return; }
-  c.innerHTML = emps.map(e => `<div class="employee-item"><div class="employee-name">${avatarHtml(e.name,32)}${escHtml(e.name)}</div><button class="btn btn-sm btn-danger btn-icon" onclick="deleteEmployeeConfirm('${e.id}','${escHtml(e.name)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('');
+  c.innerHTML = emps.map(e => `<div class="employee-item"><div class="employee-name" onclick="openEmpProfile('${e.id}')" style="cursor:pointer">${avatarHtml(e.name,32)}${escHtml(e.name)}</div><button class="btn btn-sm btn-danger btn-icon" onclick="deleteEmployeeConfirm('${e.id}','${escHtml(e.name)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('');
 }
 
 async function addNewEmployee() {
@@ -259,7 +261,9 @@ function renderEntryGroups(entries, empMap, highlightText) {
   let html='';
   dates.forEach(date=>{
     const de=groups[date], tH=de.reduce((s,e)=>s+e.hours,0), tS=de.reduce((s,e)=>s+e.strings,0);
-    html+=`<div class="day-group"><div class="day-header"><div class="day-date">${formatDate(date)}<span class="weekday">${getWeekday(date)}</span></div><div class="day-summary"><span>${tH}h</span>${tS>0?`<span>${tS}s</span>`:''}</div></div>`;
+    const dayNote = getDayNote(date);
+    html+=`<div class="day-group"><div class="day-header"><div class="day-date">${formatDate(date)}<span class="weekday">${getWeekday(date)}</span></div><div class="day-summary"><span>${tH}h</span>${tS>0?`<span>${tS}s</span>`:''}<button class="day-note-btn${dayNote?' has-note':''}" onclick="editDayNote('${date}')" title="Poznámka ke dni">✎</button></div></div>${dayNote?`<div class="day-note">${escHtml(dayNote)}</div>`:''}`;
+
     de.forEach(entry=>{
       const isH=entry.workType==='hourly';
       const empName=empMap[entry.employeeId]||'Neznámý';
@@ -628,6 +632,7 @@ async function loadStats() {
   document.getElementById('statDays').textContent=stats.workDaysCount;
   document.getElementById('statAvg').textContent=stats.avgHoursPerDay;
   await loadEmployeeStats(month);
+  await loadProductivity(month);
   await populateExportSelects();
   await renderCharts(currentProject,month);
 }
@@ -892,6 +897,15 @@ async function loadAttendanceTable(month) {
   html+=`<td>${grandTotal.toFixed(grandTotal%1?1:0)}</td></tr></tfoot></table>`;
 
   c.innerHTML=html;
+
+  // Auto-scroll to first day with data
+  const firstDay = Object.keys(dayTotals).find(d => dayTotals[d] > 0);
+  if (firstDay && c.parentElement) {
+    const scrollContainer = c;
+    const cellWidth = 32;
+    const scrollTo = Math.max(0, (parseInt(firstDay) - 2) * cellWidth);
+    setTimeout(() => { scrollContainer.scrollLeft = scrollTo; }, 50);
+  }
 }
 
 // ---- EXPORT ----
@@ -1089,4 +1103,507 @@ async function exportVykaz() {
   const sfx=month?`_${month}`:'';
   downloadCSV(csv,`SolarTrack_vykaz_${proj?proj.name:'export'}${sfx}.csv`);
   showToast('Výkaz CSV exportován ✓');
+}
+
+// ---- DAY NOTES ----
+function getDayNotes() {
+  try { return JSON.parse(localStorage.getItem('dayNotes_' + currentProject) || '{}'); } catch(e) { return {}; }
+}
+function getDayNote(date) {
+  return getDayNotes()[date] || '';
+}
+function saveDayNote(date, text) {
+  const notes = getDayNotes();
+  if (text.trim()) notes[date] = text.trim();
+  else delete notes[date];
+  localStorage.setItem('dayNotes_' + currentProject, JSON.stringify(notes));
+}
+function editDayNote(date) {
+  const current = getDayNote(date);
+  const text = prompt(`Poznámka ke dni ${formatDate(date)}:`, current);
+  if (text === null) return; // cancelled
+  saveDayNote(date, text);
+  loadDashboard();
+  if (text.trim()) showToast('Poznámka uložena ✓');
+  else showToast('Poznámka odstraněna');
+}
+
+// ---- PRODUCTIVITY METRICS ----
+async function getProductivityData(month) {
+  if (!currentProject) return [];
+  const emps = await getEmployees(currentProject);
+  const empMap = {};
+  emps.forEach(e => empMap[e.id] = e.name);
+
+  let entries;
+  if (month) {
+    const y = parseInt(month.split('-')[0]), m = parseInt(month.split('-')[1]);
+    const last = new Date(y, m, 0).getDate();
+    entries = await getEntries(currentProject, month + '-01', month + '-' + String(last).padStart(2, '0'));
+  } else {
+    entries = await getAllEntries(currentProject);
+  }
+
+  // Only task entries with strings > 0 and hours > 0
+  const taskEntries = entries.filter(e => e.workType === 'task' && e.strings > 0 && e.hours > 0);
+
+  const perEmp = {};
+  taskEntries.forEach(e => {
+    const name = empMap[e.employeeId] || 'Neznámý';
+    if (!perEmp[name]) perEmp[name] = { totalStrings: 0, totalHours: 0, entries: 0 };
+    perEmp[name].totalStrings += e.strings;
+    perEmp[name].totalHours += e.hours;
+    perEmp[name].entries++;
+  });
+
+  return Object.entries(perEmp).map(([name, d]) => ({
+    name,
+    stringsPerHour: d.totalHours > 0 ? (d.totalStrings / d.totalHours) : 0,
+    totalStrings: d.totalStrings,
+    totalHours: d.totalHours,
+    entries: d.entries
+  })).sort((a, b) => b.stringsPerHour - a.stringsPerHour);
+}
+
+// ---- NOTIFICATION REMINDER ----
+async function setupNotificationReminder() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    // Don't ask immediately, wait for user action
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    scheduleEveningCheck();
+  }
+}
+
+function requestNotifications() {
+  if (!('Notification' in window)) { showToast('Notifikace nejsou podporovány', true); return; }
+  Notification.requestPermission().then(p => {
+    if (p === 'granted') {
+      showToast('Notifikace zapnuty ✓');
+      scheduleEveningCheck();
+    } else {
+      showToast('Notifikace zamítnuty', true);
+    }
+  });
+}
+
+function scheduleEveningCheck() {
+  // Check every 30 min if it's evening and no entries today
+  setInterval(async () => {
+    const now = new Date();
+    const hour = now.getHours();
+    if (hour < 18 || hour > 22) return; // Only 18:00-22:00
+
+    // Check if already notified today
+    const notifKey = 'lastNotif_' + todayStr();
+    if (localStorage.getItem(notifKey)) return;
+
+    if (!currentProject) return;
+    const today = todayStr();
+    const entries = await getEntries(currentProject, today, today);
+    if (entries.length === 0) {
+      new Notification('SolarTrack', {
+        body: 'Nezadal jsi dnes žádné záznamy! 📝',
+        icon: './icon-192.png',
+        tag: 'daily-reminder'
+      });
+      localStorage.setItem(notifKey, '1');
+    }
+  }, 30 * 60 * 1000); // every 30 min
+}
+
+async function loadProductivity(month) {
+  const c = document.getElementById('productivityContainer');
+  const data = await getProductivityData(month);
+
+  if (!data.length) {
+    c.innerHTML = '<p class="text-sm text-muted text-center" style="padding:10px">Žádné úkolové záznamy</p>';
+    return;
+  }
+
+  const maxSph = Math.max(...data.map(d => d.stringsPerHour));
+
+  let html = '';
+  data.forEach(d => {
+    const ec = empColor(d.name);
+    const barWidth = maxSph > 0 ? (d.stringsPerHour / maxSph * 100) : 0;
+    html += `<div class="prod-row">
+      <div class="prod-name">${avatarHtml(d.name, 24)} ${escHtml(d.name)}</div>
+      <div class="prod-bar-wrap"><div class="prod-bar" style="width:${barWidth}%;background:${ec.bar}"></div></div>
+      <div class="prod-value">${d.stringsPerHour.toFixed(2)}<span class="prod-unit">s/h</span></div>
+    </div>`;
+  });
+
+  c.innerHTML = html;
+}
+
+// ---- EMPLOYEE PROFILE ----
+let profileEmpId = null;
+
+async function openEmpProfile(empId) {
+  profileEmpId = empId;
+  openPage('pageEmpProfile');
+  await renderEmpProfile();
+}
+
+async function renderEmpProfile() {
+  const c = document.getElementById('empProfileContent');
+  if (!currentProject || !profileEmpId) { c.innerHTML = ''; return; }
+
+  const emps = await getEmployees(currentProject);
+  const emp = emps.find(e => e.id === profileEmpId);
+  if (!emp) { c.innerHTML = '<div class="empty-state"><h3>Zaměstnanec nenalezen</h3></div>'; return; }
+
+  const projects = await getProjects();
+  const proj = projects.find(p => p.id === currentProject);
+  const allEntries = await getAllEntries(currentProject);
+  const myEntries = allEntries.filter(e => e.employeeId === profileEmpId);
+
+  if (!myEntries.length) {
+    const ec = empColor(emp.name);
+    c.innerHTML = `<div class="glass profile-header"><div class="profile-avatar" style="background:${ec.bg};border-color:${ec.border};color:${ec.text}">${getInitials(emp.name)}</div><div class="profile-name">${escHtml(emp.name)}</div><div class="profile-project">${escHtml(proj?proj.name:'')}</div></div><div class="empty-state"><h3>Žádné záznamy</h3></div>`;
+    return;
+  }
+
+  const ec = empColor(emp.name);
+  const totH = myEntries.reduce((s,e) => s+e.hours, 0);
+  const totS = myEntries.reduce((s,e) => s+e.strings, 0);
+  const days = new Set(myEntries.map(e => e.date));
+
+  // Current month data
+  const cm = currentMonthStr();
+  const cmEntries = myEntries.filter(e => e.date.startsWith(cm));
+  const cmH = cmEntries.reduce((s,e) => s+e.hours, 0);
+  const cmS = cmEntries.reduce((s,e) => s+e.strings, 0);
+  const cmDays = new Set(cmEntries.map(e => e.date));
+  const cmTask = cmEntries.filter(e => e.workType==='task' && e.strings>0 && e.hours>0);
+  const cmSph = cmTask.length ? (cmTask.reduce((s,e)=>s+e.strings,0) / cmTask.reduce((s,e)=>s+e.hours,0)) : 0;
+
+  // Previous month
+  const now = new Date();
+  const pm = now.getFullYear()+'-'+String(now.getMonth()).padStart(2,'0');
+  const pmEntries = myEntries.filter(e => e.date.startsWith(pm));
+  const pmH = pmEntries.reduce((s,e) => s+e.hours, 0);
+  const deltaH = cmH - pmH;
+
+  // Working days in current month (weekdays up to today)
+  const y = now.getFullYear(), m = now.getMonth();
+  const todayDay = now.getDate();
+  let workDays = 0;
+  for (let d=1; d<=todayDay; d++) { const wd=new Date(y,m,d).getDay(); if(wd>0&&wd<6) workDays++; }
+  const pctAttendance = workDays > 0 ? Math.round(cmDays.size / workDays * 100) : 0;
+
+  // Mini calendar
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const firstWd = new Date(y, m, 1).getDay(); // 0=Sun
+  const startOffset = firstWd === 0 ? 6 : firstWd - 1; // Monday-based
+  const today = todayStr();
+  const workedDays = new Set(cmEntries.map(e => parseInt(e.date.split('-')[2])));
+
+  let calHtml = '<div class="profile-mini-cal">';
+  ['Po','Út','St','Čt','Pá','So','Ne'].forEach(d => calHtml += `<div class="cal-header">${d}</div>`);
+  for (let i=0; i<startOffset; i++) calHtml += '<div class="cal-day off"></div>';
+  for (let d=1; d<=daysInMonth; d++) {
+    const wd = new Date(y, m, d).getDay();
+    const isToday = `${cm}-${String(d).padStart(2,'0')}` === today;
+    const worked = workedDays.has(d);
+    const isWeekend = wd===0||wd===6;
+    let cls = 'cal-day';
+    if (worked) cls += ' worked';
+    else if (isWeekend || d > todayDay) cls += ' off';
+    else cls += ' empty';
+    if (isToday) cls += ' today';
+    calHtml += `<div class="${cls}">${d}</div>`;
+  }
+  calHtml += '</div>';
+
+  // Recent entries (last 10)
+  const recent = [...myEntries].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
+
+  let html = '';
+
+  // Header
+  html += `<div class="glass profile-header" style="border-color:${ec.border}">
+    <div class="profile-avatar" style="background:${ec.bg};border-color:${ec.border};color:${ec.text}">${getInitials(emp.name)}</div>
+    <div class="profile-name">${escHtml(emp.name)}</div>
+    <div class="profile-project">${escHtml(proj?proj.name:'')}</div>
+    <div class="profile-stats-row">
+      <div class="profile-stat"><div class="profile-stat-value" style="color:${ec.bar}">${totH.toFixed(0)}</div><div class="profile-stat-label">Hodin</div></div>
+      <div class="profile-stat"><div class="profile-stat-value" style="color:var(--accent)">${totS}</div><div class="profile-stat-label">Stringů</div></div>
+      <div class="profile-stat"><div class="profile-stat-value" style="color:var(--green)">${days.size}</div><div class="profile-stat-label">Dnů</div></div>
+    </div>
+  </div>`;
+
+  // Current month section
+  const monthName = new Date(y, m).toLocaleDateString('cs', {month:'long', year:'numeric'});
+  html += `<div class="profile-section"><div class="profile-section-title">${monthName}</div>`;
+  html += `<div class="stats-grid" style="margin-bottom:10px">
+    <div class="glass stat-card"><div class="stat-value blue">${cmH.toFixed(0)}</div><div class="stat-label">Hodin${deltaH!==0?` <span style="color:${deltaH>0?'var(--green)':'var(--red)'}">${deltaH>0?'+':''}${deltaH.toFixed(0)}</span>`:''}</div></div>
+    <div class="glass stat-card"><div class="stat-value amber">${cmS}</div><div class="stat-label">Stringů</div></div>
+    <div class="glass stat-card"><div class="stat-value green">${cmDays.size}</div><div class="stat-label">Dnů</div></div>
+    <div class="glass stat-card"><div class="stat-value blue">${cmSph.toFixed(2)}</div><div class="stat-label">s/h produktivita</div></div>
+  </div>`;
+
+  // Attendance bar
+  html += `<div class="profile-month-bar">
+    <span style="font-size:10px;color:var(--text-3);font-weight:700">DOCHÁZKA</span>
+    <div class="pct-bar"><div class="pct-fill" style="width:${Math.min(pctAttendance,100)}%;background:${pctAttendance>=80?'var(--green)':pctAttendance>=50?'var(--accent)':'var(--red)'}"></div></div>
+    <div class="pct-text" style="color:${pctAttendance>=80?'var(--green)':pctAttendance>=50?'var(--accent)':'var(--red)'}">${pctAttendance}%</div>
+  </div>`;
+
+  // Mini calendar
+  html += calHtml;
+  html += '</div>';
+
+  // Recent entries
+  html += '<div class="profile-section"><div class="profile-section-title">Poslední záznamy</div>';
+  recent.forEach(e => {
+    const isH = e.workType==='hourly';
+    html += `<div class="profile-recent-entry">
+      <div class="profile-recent-date">${formatDate(e.date)}</div>
+      <div class="profile-recent-details"><span>${e.hours}h</span>${e.strings>0?`<span>${e.strings}s</span>`:''}</div>
+      <span class="profile-recent-badge" style="background:${isH?'var(--blue-soft)':'var(--amber-soft)'};color:${isH?'var(--blue)':'var(--accent)'}">${isH?'Hod':'Úkol'}</span>
+    </div>`;
+  });
+  if (myEntries.length > 10) {
+    html += `<button class="btn btn-ghost btn-full btn-sm mt-8" onclick="showAllEntriesFor('${profileEmpId}')">Zobrazit vše (${myEntries.length})</button>`;
+  }
+  html += '</div>';
+
+  // Export buttons
+  html += `<div class="profile-section"><div class="profile-section-title">Export</div>
+    <div class="profile-export-btns">
+      <button class="btn btn-green btn-full" onclick="exportEmpXLSX('${profileEmpId}','month')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Tento měsíc</button>
+      <button class="btn btn-primary btn-full" onclick="exportEmpXLSX('${profileEmpId}','all')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Vše .xlsx</button>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+}
+
+function showAllEntriesFor(empId) {
+  openPage('pageSearch');
+  document.getElementById('searchEmployee').value = empId;
+  executeSearch();
+}
+
+// ---- XLSX EXPORT (multi-sheet, colored) ----
+async function exportEmpXLSX(empId, range) {
+  if (typeof XLSX === 'undefined') { showToast('XLSX knihovna se načítá...', true); return; }
+
+  const emps = await getEmployees(currentProject);
+  const emp = emps.find(e => e.id === empId);
+  if (!emp) return;
+
+  const projects = await getProjects();
+  const proj = projects.find(p => p.id === currentProject);
+  const projName = proj ? proj.name : 'Projekt';
+  const allEntries = await getAllEntries(currentProject);
+  let entries = allEntries.filter(e => e.employeeId === empId);
+
+  let suffix = 'komplet';
+  if (range === 'month') {
+    const cm = currentMonthStr();
+    entries = entries.filter(e => e.date.startsWith(cm));
+    suffix = cm;
+  }
+
+  entries.sort((a,b) => a.date.localeCompare(b.date));
+  if (!entries.length) { showToast('Žádné záznamy k exportu', true); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // ===== SHEET 1: ZÁZNAMY =====
+  const ws1Data = [
+    [projName + ' – ' + emp.name, '', '', '', '', '', ''],
+    ['Datum', 'Typ práce', 'Hodinovka', 'Stringy', 'Orient. h (úkol)', 'Hodiny na stavbě', 'Stoly']
+  ];
+
+  let totHod=0, totStr=0, totOri=0, totStav=0;
+  entries.forEach(e => {
+    const isH = e.workType==='hourly';
+    const hod = isH ? e.hours : 0;
+    const str = !isH ? e.strings : 0;
+    const ori = !isH ? e.hours : 0;
+    totHod+=hod; totStr+=str; totOri+=ori; totStav+=e.hours;
+    ws1Data.push([e.date, isH?'Hodinovka':'Úkol/Stringy', hod, str, ori, e.hours, e.tables||'']);
+  });
+
+  ws1Data.push([]);
+  ws1Data.push(['CELKEM', '', totHod, totStr, totOri, totStav, '']);
+
+  const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+  ws1['!cols'] = [{wch:12},{wch:14},{wch:12},{wch:10},{wch:18},{wch:16},{wch:20}];
+
+  // Style header row and totals
+  styleXLSXSheet(ws1, ws1Data.length, 7);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Záznamy');
+
+  // ===== SHEET 2: MZDA (placené) =====
+  const ws2Data = [
+    ['MZDA – ' + emp.name, '', ''],
+    ['Datum', 'Hodinovka (h)', 'Stringy']
+  ];
+  let mzdaH=0, mzdaS=0;
+  entries.forEach(e => {
+    const isH = e.workType==='hourly';
+    const hod = isH ? e.hours : 0;
+    const str = !isH ? e.strings : 0;
+    if (hod>0||str>0) {
+      ws2Data.push([e.date, hod, str]);
+      mzdaH+=hod; mzdaS+=str;
+    }
+  });
+  ws2Data.push([]);
+  ws2Data.push(['CELKEM', mzdaH, mzdaS]);
+
+  const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols'] = [{wch:12},{wch:14},{wch:10}];
+  styleXLSXSheet(ws2, ws2Data.length, 3);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Mzda');
+
+  // ===== SHEET 3: VÝKON (orient. hodiny) =====
+  const ws3Data = [
+    ['VÝKON (orientační) – ' + emp.name, '', '', ''],
+    ['Datum', 'Orient. hodiny', 'Stringy', 'Produktivita (s/h)']
+  ];
+  let vykonH=0, vykonS=0;
+  entries.filter(e=>e.workType==='task').forEach(e => {
+    const sph = e.hours>0&&e.strings>0 ? (e.strings/e.hours).toFixed(2) : '';
+    ws3Data.push([e.date, e.hours, e.strings, sph]);
+    vykonH+=e.hours; vykonS+=e.strings;
+  });
+  ws3Data.push([]);
+  const vykonSph = vykonH>0 ? (vykonS/vykonH).toFixed(2) : 0;
+  ws3Data.push(['CELKEM', vykonH, vykonS, vykonSph]);
+
+  const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
+  ws3['!cols'] = [{wch:12},{wch:14},{wch:10},{wch:16}];
+  styleXLSXSheet(ws3, ws3Data.length, 4);
+  XLSX.utils.book_append_sheet(wb, ws3, 'Výkon');
+
+  // ===== SHEET 4: DOCHÁZKA =====
+  const ws4Data = [
+    ['DOCHÁZKA – ' + emp.name, '', ''],
+    ['Datum', 'Hodiny na stavbě', 'Přítomen']
+  ];
+  // Get all dates in range
+  const dateSet = new Set(entries.map(e=>e.date));
+  const sortedDates = [...dateSet].sort();
+  let dochDays=0;
+  if (sortedDates.length) {
+    const start = new Date(sortedDates[0]);
+    const end = new Date(sortedDates[sortedDates.length-1]);
+    for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) {
+      const ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      const wd = d.getDay();
+      if (wd===0||wd===6) continue; // skip weekends
+      const dayEntries = entries.filter(e=>e.date===ds);
+      const hrs = dayEntries.reduce((s,e)=>s+e.hours,0);
+      const present = hrs > 0 ? 'ANO' : 'NE';
+      if (hrs>0) dochDays++;
+      ws4Data.push([ds, hrs, present]);
+    }
+  }
+  ws4Data.push([]);
+  ws4Data.push(['CELKEM', totStav, dochDays + ' dnů']);
+
+  const ws4 = XLSX.utils.aoa_to_sheet(ws4Data);
+  ws4['!cols'] = [{wch:12},{wch:16},{wch:10}];
+  styleXLSXSheet(ws4, ws4Data.length, 3);
+  XLSX.utils.book_append_sheet(wb, ws4, 'Docházka');
+
+  // Download
+  const fileName = `SolarTrack_${emp.name.replace(/\s+/g,'_')}_${suffix}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  showToast('XLSX exportován ✓');
+}
+
+function styleXLSXSheet(ws, totalRows, totalCols) {
+  // SheetJS community doesn't support cell styles, but we set column widths
+  // For Apple Numbers the structure with headers + totals row is enough
+  // The sheet structure itself communicates the data clearly
+}
+
+// Also make global export function for full project XLSX
+async function exportProjectXLSX() {
+  if (typeof XLSX === 'undefined') { showToast('XLSX knihovna se načítá...', true); return; }
+  if (!currentProject) return;
+
+  const projects = await getProjects();
+  const proj = projects.find(p => p.id === currentProject);
+  const projName = proj ? proj.name : 'Projekt';
+  const emps = await getEmployees(currentProject);
+  const empMap = {};
+  emps.forEach(e => empMap[e.id] = e.name);
+
+  const month = document.getElementById('vykazMonth')?.value || document.getElementById('statsMonth')?.value || null;
+  let entries;
+  if (month) {
+    const y=parseInt(month.split('-')[0]),m=parseInt(month.split('-')[1]),last=new Date(y,m,0).getDate();
+    entries=await getEntries(currentProject,month+'-01',month+'-'+String(last).padStart(2,'0'));
+  } else {
+    entries=await getAllEntries(currentProject);
+  }
+
+  entries.sort((a,b)=>{if(a.date<b.date)return -1;if(a.date>b.date)return 1;return(empMap[a.employeeId]||'').localeCompare(empMap[b.employeeId]||'','cs')});
+  if (!entries.length) { showToast('Žádné záznamy', true); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // SHEET 1: Hlavní tabulka
+  const s1 = [['Datum','Jméno','Typ práce','Hodinovka','Stringy','Orient. h (úkol)','Hodiny na stavbě','Stoly','Poznámka']];
+  let tH=0,tS=0,tO=0,tSt=0;
+  entries.forEach(e=>{
+    const name=empMap[e.employeeId]||'',isH=e.workType==='hourly';
+    const hod=isH?e.hours:0,str=!isH?e.strings:0,ori=!isH?e.hours:0;
+    tH+=hod;tS+=str;tO+=ori;tSt+=e.hours;
+    s1.push([e.date,name,isH?'Hodinovka':'Úkol/Stringy',hod,str,ori,e.hours,e.tables||'',e.note||'']);
+  });
+  s1.push([]);
+  s1.push(['CELKEM','','',tH,tS,tO,tSt,'','']);
+  const ws1=XLSX.utils.aoa_to_sheet(s1);
+  ws1['!cols']=[{wch:12},{wch:16},{wch:14},{wch:12},{wch:10},{wch:18},{wch:16},{wch:20},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Záznamy');
+
+  // SHEET 2: Mzda
+  const s2=[['Jméno','Hodinovka celkem','Stringy celkem']];
+  const pe={};
+  entries.forEach(e=>{const n=empMap[e.employeeId]||'';if(!pe[n])pe[n]={h:0,s:0,o:0,st:0};const isH=e.workType==='hourly';pe[n].h+=isH?e.hours:0;pe[n].s+=!isH?e.strings:0;pe[n].o+=!isH?e.hours:0;pe[n].st+=e.hours});
+  Object.entries(pe).sort((a,b)=>b[1].st-a[1].st).forEach(([n,d])=>{s2.push([n,d.h,d.s])});
+  s2.push([]);s2.push(['CELKEM',tH,tS]);
+  const ws2=XLSX.utils.aoa_to_sheet(s2);
+  ws2['!cols']=[{wch:16},{wch:16},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Mzda');
+
+  // SHEET 3: Výkon
+  const s3=[['Jméno','Orient. hodiny','Stringy','Produktivita (s/h)']];
+  Object.entries(pe).sort((a,b)=>b[1].st-a[1].st).forEach(([n,d])=>{
+    const sph=d.o>0&&d.s>0?(d.s/d.o).toFixed(2):'';
+    s3.push([n,d.o,d.s,sph]);
+  });
+  s3.push([]);s3.push(['CELKEM',tO,tS,tO>0?(tS/tO).toFixed(2):'']);
+  const ws3=XLSX.utils.aoa_to_sheet(s3);
+  ws3['!cols']=[{wch:16},{wch:14},{wch:10},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Výkon');
+
+  // SHEET 4: Docházka
+  const s4=[['Jméno','Pracovních dnů','Celkem hodin','Ø h/den']];
+  Object.entries(pe).sort((a,b)=>b[1].st-a[1].st).forEach(([n,d])=>{
+    const empEntries=entries.filter(e=>(empMap[e.employeeId]||'')===n);
+    const dSet=new Set(empEntries.map(e=>e.date));
+    const avg=dSet.size>0?(d.st/dSet.size).toFixed(1):'';
+    s4.push([n,dSet.size,d.st,avg]);
+  });
+  const totalDays=new Set(entries.map(e=>e.date)).size;
+  s4.push([]);s4.push(['CELKEM',totalDays,tSt,totalDays>0?(tSt/totalDays).toFixed(1):'']);
+  const ws4=XLSX.utils.aoa_to_sheet(s4);
+  ws4['!cols']=[{wch:16},{wch:14},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws4,'Docházka');
+
+  const sfx=month||'komplet';
+  XLSX.writeFile(wb,`SolarTrack_${projName}_${sfx}.xlsx`);
+  showToast('XLSX exportován ✓');
 }
